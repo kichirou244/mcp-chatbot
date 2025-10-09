@@ -44,9 +44,7 @@ export class McpResourcesHandler {
         const uri = request.params.uri;
 
         if (uri === "resource://products") {
-          console.log("[SERVER] Resource products read request");
           const products = await this.services.productService.getProducts();
-          console.log("[SERVER] Products fetched:", products);
 
           return {
             contents: products.map((product) => ({

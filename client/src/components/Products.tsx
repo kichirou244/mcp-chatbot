@@ -1,29 +1,39 @@
 import { useEffect, useState } from "react";
-import { mcpClient } from "../client";
 import type { IProduct } from "../types/Product";
+import { getProducts } from "../actions/product.actions";
 
 export function Products() {
   const [products, setProducts] = useState<IProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const data = await getProducts();
+      setProducts(data);
+    } catch (err: any) {
+      console.error("[COMPONENT] Error:", err);
+      setError(err?.message || "Failed to fetch products");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const data = await mcpClient.getProducts();
-        setProducts(data);
-      } catch (err: any) {
-        console.error("[COMPONENT] Error:", err);
-        setError(err?.message || "Failed to fetch products");
-      } finally {
-        setLoading(false);
-      }
+    fetchProducts();
+
+    const handleProductsUpdate = () => {
+      fetchProducts();
     };
 
-    fetchProducts();
+    window.addEventListener("products-updated", handleProductsUpdate);
+
+    return () => {
+      window.removeEventListener("products-updated", handleProductsUpdate);
+    };
   }, []);
 
   if (loading) {
@@ -42,9 +52,7 @@ export function Products() {
       <div className="p-8">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
           <p className="text-red-600 text-lg">❌ {error}</p>
-          <p className="text-gray-600 mt-2">
-            Không thể tải danh sách sản phẩm
-          </p>
+          <p className="text-gray-600 mt-2">Không thể tải danh sách sản phẩm</p>
         </div>
       </div>
     );
@@ -53,10 +61,7 @@ export function Products() {
   return (
     <div className="p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-gray-800">
-          Danh sách sản phẩm
-        </h1>
-        
+
         {products.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-lg">
             <p className="text-gray-500 text-lg">Không có sản phẩm nào</p>
@@ -73,11 +78,11 @@ export function Products() {
                     {product.name}
                   </h2>
                 </div>
-                
+
                 <p className="text-gray-600 text-sm mb-4">
                   {product.description}
                 </p>
-                
+
                 <div className="flex justify-between items-center pt-4 border-t border-gray-100">
                   <div>
                     <p className="text-2xl font-bold text-green-600">

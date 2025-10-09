@@ -14,7 +14,7 @@ export class AuthService {
   async register(formData: IUserCreate): Promise<IAuthResponse> {
     const { username, password, name, phone, address } = formData;
     let connection;
-
+    
     try {
       connection = await dbPool.getConnection();
 

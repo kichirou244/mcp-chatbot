@@ -1,15 +1,23 @@
 import { createServices } from "./../services/index";
 import { Request, Response } from "express";
-import { IUserCreate } from "../models/User";
+import { IUserCreate, IUserLogin } from "../models/User";
 
 export class AuthController {
   private services = createServices();
+
+  constructor() {
+    this.register = this.register.bind(this);
+    this.login = this.login.bind(this);
+  }
 
   async register(req: Request, res: Response): Promise<void> {
     try {
       const formData = {
         username: req.body.username,
         password: req.body.password,
+        name: req.body.name,
+        phone: req.body.phone,
+        address: req.body.address,
       } as IUserCreate;
 
       const result = await this.services.authService.register(formData);
@@ -19,7 +27,7 @@ export class AuthController {
         data: result,
       });
     } catch (error: any) {
-      res.status(error.statusCode).json({ error: error.message });
+      res.status(error.statusCode || 500).json({ error: error.message });
     }
   }
 
@@ -27,17 +35,16 @@ export class AuthController {
     try {
       const { username, password } = req.body;
 
-      const result = await this.services.authService.login({
-        username,
-        password,
-      });
+      const formData = { username, password } as IUserLogin;
+
+      const result = await this.services.authService.login(formData);
 
       res.status(200).json({
         message: "Đăng nhập thành công",
         data: result,
       });
     } catch (error: any) {
-      res.status(error.statusCode).json({ error: error.message });
+      res.status(error.statusCode || 500).json({ error: error.message });
     }
   }
 }

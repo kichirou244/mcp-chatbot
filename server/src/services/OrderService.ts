@@ -24,6 +24,7 @@ export class OrderService {
         if (!user) {
           throw new AppError("Người dùng không tồn tại", 404);
         }
+        orderUserId = userId;
       } else {
         if (
           !guestInfo ||
@@ -31,7 +32,10 @@ export class OrderService {
           !guestInfo.phone ||
           !guestInfo.address
         ) {
-          throw new AppError("Thông tin khách hàng không đầy đủ", 400);
+          throw new AppError(
+            "Thông tin khách hàng không đầy đủ. Cần có: name, phone, address",
+            400
+          );
         }
 
         const [guestResult] = await connection.query(
@@ -66,11 +70,19 @@ export class OrderService {
 
         const product = products[0];
 
+        if (product.quantity < item.quantity) {
+          throw new AppError(
+            `Sản phẩm "${product.name}" không đủ số lượng. Còn lại: ${product.quantity}, yêu cầu: ${item.quantity}`,
+            400
+          );
+        }
+
         const itemTotal = product.price * item.quantity;
         totalAmount += itemTotal;
 
         orderDetails.push({
           productId: item.productId,
+          productName: product.name,
           quantity: item.quantity,
           unitPrice: product.price,
           subtotal: itemTotal,
@@ -79,7 +91,7 @@ export class OrderService {
 
       const [orderResult] = (await connection.execute(
         "INSERT INTO `orders` (user_id, date, total_amount, status) VALUES (?, NOW(), ?, 'PENDING')",
-        [userId, totalAmount]
+        [orderUserId, totalAmount]
       )) as any;
 
       const orderId = orderResult.insertId;
@@ -89,20 +101,31 @@ export class OrderService {
           "INSERT INTO order_details (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
           [orderId, detail.productId, detail.quantity, detail.unitPrice]
         );
+
+        await connection.execute(
+          "UPDATE products SET quantity = quantity - ? WHERE id = ?",
+          [detail.quantity, detail.productId]
+        );
       }
 
       await connection.commit();
 
       return {
         orderId,
-        userId,
+        userId: orderUserId,
         totalAmount,
         orderDetails,
+        status: "PENDING",
       };
     } catch (error) {
       if (connection) {
         await connection.rollback();
       }
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
       throw new AppError(`Failed to create order: ${error}`, 500);
     } finally {
       if (connection) {

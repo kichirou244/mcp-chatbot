@@ -1,13 +1,12 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import express, { Request, Response } from "express";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { createServices } from "./services/index.js";
-import { McpResourcesHandler } from "./services/McpResourcesHandler.js";
-import { McpToolsHandler } from "./services/McpToolsHandler.js";
 import cors from "cors";
 
 import aiRoutes from "./routes/aiRoutes";
-const services = createServices();
+import productRoutes from "./routes/productRoutes";
+import mcpRoutes from "./routes/mcpRoutes";
+import authRoutes from "./routes/authRoutes";
 
 const server = new Server(
   {
@@ -21,12 +20,6 @@ const server = new Server(
     },
   }
 );
-
-const resourcesHandler = new McpResourcesHandler(server, services);
-resourcesHandler.registerAll();
-
-const toolsHandler = new McpToolsHandler(server, services);
-toolsHandler.registerAll();
 
 const transports: { [sessionId: string]: SSEServerTransport } = {};
 
@@ -78,10 +71,11 @@ router.get("/connect", async (req: Request, res: Response) => {
 
 app.use("/", router);
 app.use("/ai", aiRoutes);
+app.use("/chat", mcpRoutes);
+app.use("/product", productRoutes);
+app.use("/auth", authRoutes);
 
 const PORT = 8080;
 app.listen(PORT, () => {
-  console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
-  console.log(`✅ Registered 4 tools`);
-  console.log(`✅ Registered 1 resource`);
+  console.log(`MCP listening on port ${PORT}`);
 });
