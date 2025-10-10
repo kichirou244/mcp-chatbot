@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom";
 import { useNotification } from "../contexts/NotificationContext";
+import { logout } from "../actions/auth.actions";
 
 export default function Header() {
   const accessToken = localStorage.getItem("accessToken");
-  const { showNotification } = useNotification();
+  const showNotification = useNotification();
 
   return (
     <header className="w-full flex justify-between items-center px-8 py-4 bg-white shadow-sm fixed top-0 left-0 z-20">
@@ -17,8 +18,8 @@ export default function Header() {
         </NavLink>
       ) : (
         <button
-          onClick={() => {
-            localStorage.removeItem("accessToken");
+          onClick={async () => {
+            await logout();
 
             showNotification("Đăng xuất thành công!", "success");
 

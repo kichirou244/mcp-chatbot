@@ -48,3 +48,29 @@ export const register = async (formData: IRegisterRequest) => {
     console.error("Registration error:", error);
   }
 };
+
+export const getMe = async () => {
+  try {
+    const accessToken = localStorage.getItem("accessToken");
+
+    if (!accessToken) return null;
+
+    const response = await fetch(`${BASE_URL}/auth/me`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const data = await response.json();
+    if (response.ok) {
+      return data as IAuthResponse;
+    }
+  } catch (error) {
+    console.error("Get me error:", error);
+  }
+};
+
+export const logout = () => {
+  localStorage.removeItem("accessToken");
+};

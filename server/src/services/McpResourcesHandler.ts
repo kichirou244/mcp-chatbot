@@ -54,21 +54,6 @@ export class McpResourcesHandler {
             })),
           };
         }
-
-        if (uri === "resource://orders") {
-          console.log("[SERVER] Resource orders read request");
-          const orders = await this.services.orderService.getOrders();
-          console.log("[SERVER] Orders fetched:", orders);
-
-          return {
-            contents: orders.map((order) => ({
-              uri: `resource://orders/${order.id}`,
-              text: JSON.stringify(order),
-              mimeType: "application/json",
-            })),
-          };
-        }
-
         throw new Error(`Unknown resource: ${uri}`);
       }
     );

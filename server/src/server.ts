@@ -3,10 +3,11 @@ import express, { Request, Response } from "express";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import cors from "cors";
 
-import aiRoutes from "./routes/aiRoutes";
 import productRoutes from "./routes/productRoutes";
-import mcpRoutes from "./routes/mcpRoutes";
 import authRoutes from "./routes/authRoutes";
+import { createServices } from "./services/index.js";
+import { McpResourcesHandler } from "./services/McpResourcesHandler.js";
+import { McpToolsHandler } from "./services/McpToolsHandler.js";
 
 const server = new Server(
   {
@@ -21,6 +22,13 @@ const server = new Server(
   }
 );
 
+const services = createServices();
+const resourcesHandler = new McpResourcesHandler(server, services);
+const toolsHandler = new McpToolsHandler(server, services);
+
+resourcesHandler.registerAll();
+toolsHandler.registerAll();
+
 const transports: { [sessionId: string]: SSEServerTransport } = {};
 
 const app = express();
@@ -30,6 +38,11 @@ app.use(express.json());
 const router = express.Router();
 
 const POST_ENDPOINT = "/messages";
+
+router.use((req: Request, res: Response, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 router.post(POST_ENDPOINT, async (req: Request, res: Response) => {
   console.log("message request received: ", req.body);
@@ -70,8 +83,6 @@ router.get("/connect", async (req: Request, res: Response) => {
 });
 
 app.use("/", router);
-app.use("/ai", aiRoutes);
-app.use("/chat", mcpRoutes);
 app.use("/product", productRoutes);
 app.use("/auth", authRoutes);
 

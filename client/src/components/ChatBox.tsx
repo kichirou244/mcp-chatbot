@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { chatWithAi } from "../actions/aiAgent.actions";
 import type { ChatMessage, ProgressEvent } from "../actions/aiAgent.actions";
+import ReactMarkdown from "react-markdown";
+import { chatWithMcpTools } from "../actions/mcpTools.actions";
 
 interface Message {
   id: string;
@@ -21,8 +22,7 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
     {
       id: "welcome",
       type: "system",
-      content:
-        "👋 Xin chào! Bạn có thể hỏi về sản phẩm hoặc đặt hàng.",
+      content: "👋 Xin chào! Bạn có thể hỏi về sản phẩm hoặc đặt hàng.",
       timestamp: new Date(),
     },
   ]);
@@ -41,7 +41,6 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
   const buildChatHistory = (): ChatMessage[] => {
     return messages
       .filter((msg) => msg.type === "user" || msg.type === "bot")
-      .slice(-10)
       .map((msg) => ({
         role: msg.type === "user" ? "user" : "assistant",
         content: msg.content,
@@ -75,7 +74,7 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
     try {
       const chatHistory = buildChatHistory();
 
-      const response = await chatWithAi(
+      const response = await chatWithMcpTools(
         currentInput,
         chatHistory,
         (progress: ProgressEvent) => {
@@ -117,7 +116,7 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
           window.dispatchEvent(new CustomEvent("products-updated"));
         }
       } else {
-        throw new Error(response.message || "Đã xảy ra lỗi");
+        throw new Error("Đã xảy ra lỗi");
       }
     } catch (error: any) {
       setMessages((prev) => prev.filter((msg) => msg.id !== progressMessageId));
@@ -147,7 +146,7 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
     <div className="fixed bottom-4 right-4 w-96 h-[600px] bg-white rounded-lg shadow-2xl flex flex-col z-50">
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-t-lg flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+          <div className="w-3 h-3 bg-green-400 rounded-full"></div>
           <h3 className="font-semibold">Chat bot</h3>
         </div>
         <button
@@ -171,35 +170,26 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
                 msg.type === "user"
                   ? "bg-blue-500 text-white"
                   : msg.type === "system"
-                  ? "bg-yellow-100 text-gray-800 text-sm"
+                  ? "bg-gray-200 text-gray-500 text-sm italic"
                   : msg.type === "progress"
-                  ? "bg-purple-100 text-purple-800 text-sm italic animate-pulse"
+                  ? "bg-purple-100 text-purple-500 text-sm italic"
                   : "bg-white text-gray-800 shadow"
               }`}
             >
-              <div className="whitespace-pre-wrap">{msg.content}</div>
-
-              {msg.tool === "search_products" && msg.data?.data && (
-                <div className="mt-2 pt-2 border-t border-gray-200">
-                  <p className="text-xs font-semibold mb-2">
-                    Sản phẩm tìm thấy:
-                  </p>
-                  {msg.data.data.slice(0, 3).map((product: any) => (
-                    <div
-                      key={product.id}
-                      className="text-xs bg-gray-50 p-2 rounded mb-1"
-                    >
-                      <div className="font-semibold">{product.name}</div>
-                      <div className="text-blue-600">
-                        {product.price?.toLocaleString()} VNĐ
-                      </div>
-                    </div>
-                  ))}
+              {msg.type === "bot" ? (
+                <div className="prose prose-sm max-w-none">
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
+              ) : (
+                <div className="whitespace-pre-wrap">{msg.content}</div>
               )}
 
               <div className="text-xs opacity-70 mt-1">
-                {msg.timestamp.toLocaleTimeString()}
+                {msg.timestamp.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                })}
               </div>
             </div>
           </div>

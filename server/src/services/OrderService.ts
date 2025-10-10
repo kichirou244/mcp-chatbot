@@ -1,5 +1,4 @@
 import { dbPool } from "../config/database";
-import { IOrder } from "../models/Order";
 import { IProduct } from "../models/Product";
 import { AppError } from "../utils/errors";
 import { UserService } from "./UserService";
@@ -127,31 +126,6 @@ export class OrderService {
       }
 
       throw new AppError(`Failed to create order: ${error}`, 500);
-    } finally {
-      if (connection) {
-        connection.release();
-      }
-    }
-  }
-
-  async getOrders() {
-    let connection;
-
-    try {
-      connection = await dbPool.getConnection();
-
-      const [orderRows] = await connection.query(`
-        SELECT u.*, o.*, od.*, p.*
-        FROM orders o
-        JOIN order_details od ON o.id = od.order_id
-        JOIN products p ON od.product_id = p.id
-        JOIN users u ON o.user_id = u.id
-      `);
-      const orders = orderRows as IOrder[];
-
-      return orders;
-    } catch (error) {
-      throw new AppError(`Failed to get orders: ${error}`, 500);
     } finally {
       if (connection) {
         connection.release();

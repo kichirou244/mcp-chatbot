@@ -17,7 +17,7 @@ export default function FormRegister({
   });
 
   const [showPassword, setShowPassword] = useState(false);
-  const { showNotification } = useNotification();
+  const showNotification = useNotification();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

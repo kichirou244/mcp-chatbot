@@ -5,6 +5,8 @@ import HomePage from "./pages/Home";
 import AuthPage from "./pages/Auth";
 import { NotificationProvider } from "./contexts/NotificationContext";
 
+const BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:8080";
+
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -12,7 +14,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const connectToServer = async () => {
       try {
-        await mcpClient.connect("http://localhost:8080/connect");
+        await mcpClient.connect(`${BASE_URL}/connect`);
         setIsConnected(true);
         setConnectionError(null);
       } catch (error: any) {

@@ -7,7 +7,7 @@ export default function FormLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
-  const { showNotification } = useNotification();
+  const showNotification = useNotification();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

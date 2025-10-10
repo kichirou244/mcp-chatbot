@@ -4,8 +4,3 @@ export interface IOrderCreate {
     date: Date;
     totalAmount: number;
 }
-
-export interface IOrder {
-    id: number;
-    status: string;
-}
