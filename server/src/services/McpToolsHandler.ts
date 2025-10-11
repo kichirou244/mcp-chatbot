@@ -612,6 +612,7 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
   }
 
   private parseAIResponse(response: string): any {
+    console.log(response);
     const cleaned = response
       .replace(/```json\n?/g, "")
       .replace(/```\n?/g, "")

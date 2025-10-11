@@ -1,7 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-
-const BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:8080";
+import { mcpClient } from "../client";
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -19,34 +16,14 @@ export async function chatWithMcpTools(
   chatHistory: ChatMessage[] = [],
   onProgress?: (progress: ProgressEvent) => void
 ) {
-  let client: Client | null = null;
-
   try {
     onProgress?.({
       step: "connecting",
       message: "Đang kết nối tới MCP Server...",
     });
 
-    const transport = new SSEClientTransport(new URL(`${BASE_URL}/connect`));
-
-    client = new Client(
-      {
-        name: "mcp-client",
-        version: "1.0.0",
-      },
-      {
-        capabilities: {},
-      }
-    );
-
-    await client.connect(transport);
+    await mcpClient.ensureConnected();
     console.log("[MCP Client] Connected");
-
-    const { tools } = await client.listTools();
-    console.log(
-      "[Available Tools]",
-      tools.map((t) => t.name)
-    );
 
     const conversationContext = buildConversationContext(chatHistory);
 
@@ -55,13 +32,12 @@ export async function chatWithMcpTools(
       message: "Đang phân tích...",
     });
 
-    const analysisResult = await client.callTool({
-      name: "analyze_intent",
-      arguments: { message, conversationContext },
+    const analysisResult = await mcpClient.callTool("analyze_intent", {
+      message,
+      conversationContext,
     });
 
     const analysis = JSON.parse((analysisResult as any).content[0].text);
-    console.log("[Analysis]", analysis);
 
     onProgress?.({
       step: "analyzed",
@@ -76,9 +52,9 @@ export async function chatWithMcpTools(
       case "search_products":
         onProgress?.({ step: "executing", message: "Đang tìm kiếm..." });
 
-        const searchResult = await client.callTool({
-          name: "search_products",
-          arguments: { query: message, conversationContext },
+        const searchResult = await mcpClient.callTool("search_products", {
+          query: message,
+          conversationContext,
         });
 
         toolResult = JSON.parse((searchResult as any).content[0].text);
@@ -92,9 +68,10 @@ export async function chatWithMcpTools(
         onProgress?.({ step: "executing", message: "Đang xử lý đơn hàng..." });
 
         const accessToken = localStorage.getItem("accessToken");
-        const orderResult = await client.callTool({
-          name: "create_order",
-          arguments: { message, conversationContext, accessToken },
+        const orderResult = await mcpClient.callTool("create_order", {
+          message,
+          conversationContext,
+          accessToken,
         });
 
         toolResult = JSON.parse((orderResult as any).content[0].text);
@@ -112,17 +89,15 @@ export async function chatWithMcpTools(
         toolResult = { success: false, error: `Unknown tool: ${toolName}` };
     }
 
-    console.log("[Tool Result]", toolResult);
-
     onProgress?.({
       step: "generating",
       message: "Đang tạo phản hồi...",
     });
 
-    const finalResponseResult = await client.callTool({
-      name: "generate_final_response",
-      arguments: { message, conversationContext, tool: toolName, toolResult },
-    });
+    const finalResponseResult = await mcpClient.callTool(
+      "generate_final_response",
+      { message, conversationContext, tool: toolName, toolResult }
+    );
 
     const finalResponse = JSON.parse(
       (finalResponseResult as any).content[0].text
@@ -143,46 +118,28 @@ export async function chatWithMcpTools(
   } catch (error: any) {
     console.error("[chatWithMcpTools Error]", error);
     throw error;
-  } finally {
-    if (client) {
-      try {
-        await client.close();
-      } catch (e) {
-        console.error("Error closing client:", e);
-      }
-    }
   }
 }
 
 export async function listAvailableTools() {
-  let client: Client | null = null;
   try {
-    const transport = new SSEClientTransport(new URL(`${BASE_URL}/connect`));
-    client = new Client(
-      { name: "tools-lister", version: "1.0.0" },
-      { capabilities: {} }
-    );
-    await client.connect(transport);
-    const { tools } = await client.listTools();
+    await mcpClient.ensureConnected();
+    const { tools } = await mcpClient.listTools();
     return tools;
-  } finally {
-    if (client) await client.close();
+  } catch (error) {
+    console.error("[listAvailableTools Error]", error);
+    throw error;
   }
 }
 
 export async function listAvailableResources() {
-  let client: Client | null = null;
   try {
-    const transport = new SSEClientTransport(new URL(`${BASE_URL}/connect`));
-    client = new Client(
-      { name: "resources-lister", version: "1.0.0" },
-      { capabilities: {} }
-    );
-    await client.connect(transport);
-    const { resources } = await client.listResources();
+    await mcpClient.ensureConnected();
+    const { resources } = await mcpClient.listResources();
     return resources;
-  } finally {
-    if (client) await client.close();
+  } catch (error) {
+    console.error("[listAvailableResources Error]", error);
+    throw error;
   }
 }
 
