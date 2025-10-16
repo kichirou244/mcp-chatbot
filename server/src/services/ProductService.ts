@@ -37,7 +37,7 @@ export class ProductService {
       connection = await dbPool.getConnection();
 
       const [rows] = await connection.query(
-        `SELECT p.id, p.name, p.description, p.price, p.outlet_id AS outletId, o.name AS outletName, o.address AS outletAddress
+        `SELECT p.id, p.name, p.description, p.price, p.quantity, p.outlet_id AS outletId, o.name AS outletName, o.address AS outletAddress
          FROM products p
          JOIN outlets o ON p.outlet_id = o.id`
       );
