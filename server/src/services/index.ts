@@ -5,6 +5,7 @@ import { OrderService } from "./OrderService";
 import { OrderDetailService } from "./OrderDetailService";
 import { ProductService } from "./ProductService";
 import { AiAgent } from "./AiAgent";
+import { EmbeddingService } from "./EmbeddingService";
 
 export const createServices = () => {
   const authService = new AuthService();
@@ -14,6 +15,7 @@ export const createServices = () => {
   const orderDetailService = new OrderDetailService();
   const productService = new ProductService();
   const aiAgent = new AiAgent();
+  const embeddingService = new EmbeddingService();
 
   return {
     authService,
@@ -23,5 +25,6 @@ export const createServices = () => {
     orderDetailService,
     productService,
     aiAgent,
+    embeddingService,
   };
 };

@@ -9,7 +9,8 @@
     "dev:server": "cd server && npm run dev",
     "install:all": "npm install && cd client && npm install && cd ../server && npm install",
     "build:server": "cd server && npm run build",
-    "dev:stdio": "cd server && npm run dev:stdio"
+    "dev:stdio": "cd server && npm run dev:stdio",
+    "server:index": "cd server && npm run index:products-outlets"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

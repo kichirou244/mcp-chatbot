@@ -19,92 +19,6 @@ export class McpToolsHandler {
     this.registerCallToolHandler();
   }
 
-  private static readonly DEFAULT_LLM_TIMEOUT_MS = 15000;
-  private static readonly MAX_CONTEXT_CHARS = 1800;
-  private static readonly MAX_PRODUCTS_FOR_LLM = 40;
-  private static readonly MAX_OUTLETS_FOR_LLM = 40;
-
-  private trimContext(
-    ctx: string,
-    max = McpToolsHandler.MAX_CONTEXT_CHARS
-  ): string {
-    if (!ctx) return "";
-    if (ctx.length <= max) return ctx;
-    return ctx.slice(-max);
-  }
-
-  private normalize(text: string): string {
-    return (text || "")
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-  }
-
-  private simpleScore(haystack: string, query: string): number {
-    const h = this.normalize(haystack);
-    const tokens = this.normalize(query)
-      .split(/\s+/)
-      .filter((t) => t && t.length > 1);
-    let score = 0;
-    for (const t of tokens) if (h.includes(t)) score++;
-    return score;
-  }
-
-  private prefilterProductsWithOutlets(
-    items: IProductWithOutlet[],
-    query: string,
-    limit = McpToolsHandler.MAX_PRODUCTS_FOR_LLM
-  ): IProductWithOutlet[] {
-    if (!items?.length) return [];
-    const scored = items
-      .filter((p) => (p.quantity ?? 0) > 0)
-      .map((p) => {
-        const score =
-          this.simpleScore(
-            `${p.name} ${p.outletName} ${p.outletAddress ?? ""}`,
-            query
-          ) + (this.simpleScore(String(p.price ?? ""), query) > 0 ? 0.2 : 0);
-        return { p, score };
-      })
-      .sort((a, b) => b.score - a.score);
-    const top = scored
-      .filter((s) => s.score > 0)
-      .slice(0, limit)
-      .map((s) => s.p);
-    return top.length > 0 ? top : items.slice(0, limit);
-  }
-
-  private prefilterOutlets(
-    outlets: { id: number; name: string; address?: string }[],
-    query: string,
-    limit = McpToolsHandler.MAX_OUTLETS_FOR_LLM
-  ) {
-    if (!outlets?.length) return [];
-    const scored = outlets
-      .map((o) => ({
-        o,
-        score: this.simpleScore(`${o.name} ${o.address ?? ""}`, query),
-      }))
-      .sort((a, b) => b.score - a.score);
-    const top = scored
-      .filter((s) => s.score > 0)
-      .slice(0, limit)
-      .map((s) => s.o);
-    return top.length > 0 ? top : outlets.slice(0, limit);
-  }
-
-  private async askWithTimeout(
-    agent: any,
-    model: string,
-    prompt: string,
-    timeoutMs = McpToolsHandler.DEFAULT_LLM_TIMEOUT_MS
-  ): Promise<string> {
-    const timeoutPromise = new Promise<string>((_, reject) =>
-      setTimeout(() => reject(new Error("LLM request timed out")), timeoutMs)
-    );
-    return Promise.race([agent.ask(model, prompt), timeoutPromise]);
-  }
-
   private registerListToolsHandler(): void {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
@@ -294,7 +208,7 @@ export class McpToolsHandler {
 
     const prompt = `Bạn là trợ lý thông minh cho cửa hàng thương mại điện tử. 
     Phân tích câu hỏi của người dùng dựa trên TOÀN BỘ NGỮ CẢNH hội thoại và quyết định tool phù hợp nhất.
-  ${this.trimContext(conversationContext)}
+  ${conversationContext}
 
     TOOLS có sẵn:
     1. search_products: Tìm kiếm sản phẩm (khi user hỏi về sản phẩm, muốn xem, tìm kiếm)
@@ -332,11 +246,7 @@ export class McpToolsHandler {
 
     Câu hỏi hiện tại của người dùng: "${message}"`;
 
-    const response = await this.askWithTimeout(
-      agent,
-      "gemini-2.5-flash",
-      prompt
-    );
+    const response = await agent.ask("gemini-2.5-flash", prompt);
     const analysis = this.parseAIResponse(response);
 
     console.log("[Analyze Intent] Response:", analysis);
@@ -359,10 +269,111 @@ export class McpToolsHandler {
     const { query, conversationContext = "" } = args;
     const agent = AiAgentFactory.create("gemini");
 
-    const allProductsWithOutlets: IProductWithOutlet[] =
-      await this.services.productService.getProductsOutlets();
+    try {
+      const allProductsWithOutlets: IProductWithOutlet[] =
+        await this.services.productService.getProductsOutlets();
 
-    if (allProductsWithOutlets.length === 0) {
+      if (allProductsWithOutlets.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: true,
+                tool: "search_products",
+                data: [],
+                message: "Không tìm thấy sản phẩm nào trong cơ sở dữ liệu.",
+              }),
+            },
+          ],
+        };
+      }
+
+      let enhancedQuery = query;
+      if (conversationContext) {
+        const contextPrompt = `Dựa vào ngữ cảnh hội thoại, tạo câu truy vấn tốt hơn để tìm sản phẩm.
+
+Ngữ cảnh: ${conversationContext}
+Câu hỏi hiện tại: "${query}"
+
+Hãy tạo câu truy vấn ngắn gọn (1-2 câu) chứa đầy đủ thông tin cần thiết để tìm sản phẩm.
+Chỉ trả về câu truy vấn, không giải thích.`;
+
+        enhancedQuery = await agent.ask("gemini-2.5-flash", contextPrompt);
+        enhancedQuery = enhancedQuery.trim();
+      }
+
+      const ragResults =
+        await this.services.embeddingService.searchProductsOutlets(
+          enhancedQuery,
+          40,
+          0.5
+        );
+
+      console.log(`[RAG] Found ${ragResults.length} results from Pinecone`);
+
+      let searchResults = ragResults;
+      if (ragResults.length === 0) {
+        const allMetadata = allProductsWithOutlets.map((p) => ({
+          productId: p.id,
+          productName: p.name,
+          description: p.description,
+          price: p.price,
+          quantity: p.quantity,
+          outletId: p.outletId,
+          outletName: p.outletName,
+          outletAddress: p.outletAddress,
+        }));
+        searchResults = await this.services.embeddingService.searchWithFallback(
+          enhancedQuery,
+          allMetadata,
+          40
+        );
+      }
+
+      const availableResults = searchResults.filter(
+        (item) => (item.quantity ?? 0) > 0
+      );
+
+      const resultData = availableResults.map((item) => ({
+        id: item.productId,
+        name: item.productName,
+        description: item.description,
+        price: item.price,
+        quantity: item.quantity,
+        outletId: item.outletId,
+        outletName: item.outletName,
+        outletAddress: item.outletAddress,
+      }));
+
+      let finalResults = resultData;
+      if (resultData.length > 10) {
+        const rankingPrompt = `Từ danh sách sản phẩm tìm được, chọn tối đa 10 sản phẩm phù hợp nhất với câu hỏi.
+
+Câu hỏi: "${query}"
+Ngữ cảnh: ${conversationContext}
+
+Danh sách sản phẩm:
+${JSON.stringify(resultData.slice(0, 30))}
+
+Trả về JSON:
+{
+  "selectedProducts": [id1, id2, ...],
+  "keywords": ["từ khóa"],
+  "reason": "lý do chọn"
+}`;
+
+        const rankingResponse = await agent.ask(
+          "gemini-2.5-flash",
+          rankingPrompt
+        );
+        const ranking = this.parseAIResponse(rankingResponse);
+
+        finalResults = resultData.filter((p) =>
+          ranking.selectedProducts.includes(p.id)
+        );
+      }
+
       return {
         content: [
           {
@@ -370,107 +381,143 @@ export class McpToolsHandler {
             text: JSON.stringify({
               success: true,
               tool: "search_products",
-              data: [],
-              message: "Không tìm thấy sản phẩm nào trong cơ sở dữ liệu.",
+              data: finalResults,
+              message: `Tìm thấy ${finalResults.length} sản phẩm phù hợp`,
+              searchMethod:
+                ragResults.length > 0 ? "vector_search" : "keyword_fallback",
+              totalFound: searchResults.length,
+            }),
+          },
+        ],
+      };
+    } catch (error: any) {
+      console.error("[RAG Search Products Error]", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: false,
+              tool: "search_products",
+              error: error.message,
+              message: "Lỗi khi tìm kiếm sản phẩm",
             }),
           },
         ],
       };
     }
-
-    const candidates = this.prefilterProductsWithOutlets(
-      allProductsWithOutlets,
-      query,
-      McpToolsHandler.MAX_PRODUCTS_FOR_LLM
-    );
-
-    const matchPrompt = `Dựa vào câu hỏi và ngữ cảnh hội thoại, tìm sản phẩm phù hợp nhất.
-${this.trimContext(conversationContext)}
-
-Câu hỏi hiện tại: "${query}"
-
-Danh sách sản phẩm (có thể trùng tên ở nhiều cửa hàng):
-${JSON.stringify(
-  candidates.map((p: IProductWithOutlet) => ({
-    id: p.id,
-    name: p.name,
-    price: p.price,
-    quantity: p.quantity,
-    outletId: p.outletId,
-    outletName: p.outletName,
-    outletAddress: p.outletAddress,
-  }))
-)}
-
-Tìm các sản phẩm phù hợp và trả về JSON:
-{
-  "matchedProducts": [
-    { "productId": id, "outletId": id }
-  ],
-  "keywords": ["từ khóa tìm được"],
-  "reason": "lý do match"
-}
-
-Chỉ trả về những sản phẩm có quantity > 0.
-Nếu không tìm thấy sản phẩm phù hợp, trả về matchedProducts = []`;
-
-    const matchResponse = await this.askWithTimeout(
-      agent,
-      "gemini-2.5-flash",
-      matchPrompt
-    );
-    const matchResult = this.parseAIResponse(matchResponse);
-
-    interface IMatchProduct {
-      productId: number;
-      outletId: number;
-    }
-
-    const matchProducts = matchResult.matchedProducts as IMatchProduct[];
-
-    const matchedProducts = allProductsWithOutlets.filter(
-      (p: IProductWithOutlet) =>
-        (p.quantity ?? 0) > 0 &&
-        matchProducts?.some(
-          (m: IMatchProduct) =>
-            m.productId === p.id && m.outletId === p.outletId
-        )
-    );
-
-    const resultData = matchedProducts.map((p) => ({
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      quantity: p.quantity,
-      outletId: p.outletId,
-      outletName: p.outletName,
-      outletAddress: p.outletAddress,
-    }));
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            success: true,
-            tool: "search_products",
-            data: resultData,
-            keywords: matchResult.keywords,
-            message: `Tìm thấy ${resultData.length} sản phẩm phù hợp`,
-            reason: matchResult.reason,
-          }),
-        },
-      ],
-    };
   }
 
   private async handleSearchOutlets(args: any) {
     const { query, conversationContext = "" } = args;
     const agent = AiAgentFactory.create("gemini");
 
-    const allOulets = await this.services.outletService.getOutlets();
+    try {
+      console.log(`[RAG Search Outlets] Query: "${query}"`);
 
-    if (allOulets.length === 0) {
+      const allOutlets = await this.services.outletService.getOutlets();
+
+      if (allOutlets.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: false,
+                tool: "search_outlets",
+                error: "Không tìm thấy cửa hàng nào trong cơ sở dữ liệu.",
+              }),
+            },
+          ],
+        };
+      }
+
+      let enhancedQuery = query;
+      if (conversationContext) {
+        const contextPrompt = `Dựa vào ngữ cảnh hội thoại, tạo câu truy vấn tốt hơn để tìm cửa hàng.
+
+Ngữ cảnh: ${conversationContext}
+Câu hỏi hiện tại: "${query}"
+
+Hãy tạo câu truy vấn ngắn gọn (1-2 câu) chứa đầy đủ thông tin về cửa hàng cần tìm.
+Chỉ trả về câu truy vấn, không giải thích.`;
+
+        enhancedQuery = await agent.ask("gemini-2.5-flash", contextPrompt);
+        enhancedQuery = enhancedQuery.trim();
+        console.log(`[RAG Outlets] Enhanced query: "${enhancedQuery}"`);
+      }
+
+      const ragResults =
+        await this.services.embeddingService.searchProductsOutlets(
+          enhancedQuery,
+          40,
+          0.3
+        );
+
+      console.log(
+        `[RAG Outlets] Found ${ragResults.length} results from Pinecone`
+      );
+
+      const outletIdsFromRAG = new Set(ragResults.map((item) => item.outletId));
+
+      let matchedOutlets = allOutlets.filter((outlet) =>
+        outletIdsFromRAG.has(outlet.id)
+      );
+
+      if (matchedOutlets.length === 0) {
+        console.log("[RAG Outlets] No results, using keyword search");
+        const queryLower = enhancedQuery.toLowerCase();
+        matchedOutlets = allOutlets.filter(
+          (outlet) =>
+            outlet.name?.toLowerCase().includes(queryLower) ||
+            outlet.address?.toLowerCase().includes(queryLower)
+        );
+      }
+
+      if (matchedOutlets.length === 0) {
+        console.log("[RAG Outlets] Using AI fallback");
+        const matchPrompt = `Tìm cửa hàng phù hợp với câu hỏi.
+
+Ngữ cảnh: ${conversationContext}
+Câu hỏi: "${query}"
+
+Danh sách cửa hàng:
+${JSON.stringify(allOutlets)}
+
+Trả về JSON:
+{
+  "matchedOutlets": [id1, id2, ...],
+  "keywords": ["từ khóa"],
+  "reason": "lý do chọn"
+}`;
+
+        const matchResponse = await agent.ask("gemini-2.5-flash", matchPrompt);
+        const matchResult = this.parseAIResponse(matchResponse);
+
+        matchedOutlets = allOutlets.filter((o) =>
+          matchResult.matchedOutlets.includes(o.id)
+        );
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              tool: "search_outlets",
+              data: matchedOutlets,
+              message: `Tìm thấy ${matchedOutlets.length} cửa hàng phù hợp`,
+              searchMethod:
+                outletIdsFromRAG.size > 0
+                  ? "vector_search"
+                  : "keyword_fallback",
+            }),
+          },
+        ],
+      };
+    } catch (error: any) {
+      console.error("[RAG Search Outlets Error]", error);
       return {
         content: [
           {
@@ -478,77 +525,162 @@ Nếu không tìm thấy sản phẩm phù hợp, trả về matchedProducts = [
             text: JSON.stringify({
               success: false,
               tool: "search_outlets",
-              error: "Không tìm thấy cửa hàng nào trong cơ sở dữ liệu.",
+              error: error.message,
+              message: "Lỗi khi tìm kiếm cửa hàng",
             }),
           },
         ],
       };
     }
-
-    const limitedOutlets = this.prefilterOutlets(
-      allOulets.map((o) => ({ id: o.id, name: o.name, address: o.address })),
-      query,
-      McpToolsHandler.MAX_OUTLETS_FOR_LLM
-    );
-
-    const matchPrompt = `Bạn là trợ lý AI giúp tìm kiếm cửa hàng phù hợp cho khách hàng dựa trên câu hỏi và ngữ cảnh hội thoại.
-
-Ngữ cảnh hội thoại trước đó (nếu có):
-${this.trimContext(conversationContext)}
-Câu hỏi hiện tại của khách: "${query}"
-
-DANH SÁCH CỬA HÀNG:
-${JSON.stringify(limitedOutlets)}
-
-YÊU CẦU:
-1. Phân tích câu hỏi và ngữ cảnh để xác định các cửa hàng phù hợp nhất với nhu cầu của khách.
-2. Nếu khách hỏi về cửa hàng cụ thể, hoặc dùng đại từ ("cửa hàng này", "nó", "cái đó"), hãy dựa vào ngữ cảnh để xác định cửa hàng.
-3. Trích xuất các từ khóa tìm kiếm chính từ câu hỏi.
-KẾT QUẢ:
-Trả về JSON với format sau:
-{
-  "matchedOutlets": [id1, id2, ...]
-  "keywords": ["từ khóa tìm được"],
-  "reason": "giải thích lý do chọn các cửa hàng này"
-}
-Nếu không tìm thấy cửa hàng phù hợp, trả về matchedOutlets = []`;
-
-    const matchResponse = await this.askWithTimeout(
-      agent,
-      "gemini-2.5-flash",
-      matchPrompt
-    );
-    const matchResult = this.parseAIResponse(matchResponse);
-
-    const matchedOutlets = allOulets.filter((o) =>
-      matchResult.matchedOutlets.includes(o.id)
-    );
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            success: true,
-            tool: "search_outlets",
-            data: matchedOutlets,
-            keywords: matchResult.keywords,
-            message: `Tìm thấy ${matchedOutlets.length} cửa hàng phù hợp`,
-            reason: matchResult.reason,
-          }),
-        },
-      ],
-    };
   }
 
   private async handleSearchProductsAndOutlets(args: any) {
     const { query, conversationContext = "" } = args;
     const agent = AiAgentFactory.create("gemini");
 
-    const allProductsAndOutlets =
-      await this.services.productService.getProductsOutlets();
+    try {
+      console.log(`[RAG Search Products & Outlets] Query: "${query}"`);
 
-    if (allProductsAndOutlets.length === 0) {
+      const allProductsAndOutlets =
+        await this.services.productService.getProductsOutlets();
+
+      if (allProductsAndOutlets.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: false,
+                tool: "search_products_and_outlets",
+                error:
+                  "Không tìm thấy sản phẩm hoặc cửa hàng nào trong cơ sở dữ liệu.",
+              }),
+            },
+          ],
+        };
+      }
+
+      let enhancedQuery = query;
+      if (conversationContext) {
+        const contextPrompt = `Dựa vào ngữ cảnh hội thoại, tạo câu truy vấn tốt hơn để tìm sản phẩm và cửa hàng.
+
+Ngữ cảnh: ${conversationContext}
+Câu hỏi hiện tại: "${query}"
+
+Hãy tạo câu truy vấn ngắn gọn (1-2 câu) chứa đầy đủ thông tin về sản phẩm và cửa hàng.
+Chỉ trả về câu truy vấn, không giải thích.`;
+
+        enhancedQuery = await agent.ask("gemini-2.5-flash", contextPrompt);
+        enhancedQuery = enhancedQuery.trim();
+        console.log(
+          `[RAG Products & Outlets] Enhanced query: "${enhancedQuery}"`
+        );
+      }
+
+      const ragResults =
+        await this.services.embeddingService.searchProductsOutlets(
+          enhancedQuery,
+          40,
+          0.3
+        );
+
+      console.log(
+        `[RAG Products & Outlets] Found ${ragResults.length} results from Pinecone`
+      );
+
+      let searchResults = ragResults;
+      if (ragResults.length === 0) {
+        console.log("[RAG Products & Outlets] No results, using fallback");
+        const allMetadata = allProductsAndOutlets.map((p) => ({
+          productId: p.id,
+          productName: p.name,
+          description: p.description,
+          price: p.price,
+          quantity: p.quantity,
+          outletId: p.outletId,
+          outletName: p.outletName,
+          outletAddress: p.outletAddress,
+        }));
+        searchResults = await this.services.embeddingService.searchWithFallback(
+          enhancedQuery,
+          allMetadata,
+          40
+        );
+      }
+
+      const availableResults = searchResults.filter(
+        (item) => (item.quantity ?? 0) > 0
+      );
+
+      const matched = allProductsAndOutlets.filter((p: IProductWithOutlet) =>
+        availableResults.some(
+          (r) => r.productId === p.id && r.outletId === p.outletId
+        )
+      );
+
+      let finalResults = matched;
+      if (matched.length > 15) {
+        const rankingPrompt = `Từ danh sách sản phẩm và cửa hàng tìm được, chọn tối đa 15 kết quả phù hợp nhất.
+
+Câu hỏi: "${query}"
+Ngữ cảnh: ${conversationContext}
+
+Danh sách:
+${JSON.stringify(
+  matched.slice(0, 30).map((p: IProductWithOutlet) => ({
+    productId: p.id,
+    productName: p.name,
+    outletId: p.outletId,
+    outletName: p.outletName,
+    price: p.price,
+    quantity: p.quantity,
+  }))
+)}
+
+Trả về JSON:
+{
+  "selected": [
+    { "productId": id, "outletId": id }
+  ],
+  "keywords": ["từ khóa"],
+  "reason": "lý do chọn"
+}`;
+
+        const rankingResponse = await agent.ask(
+          "gemini-2.5-flash",
+          rankingPrompt
+        );
+        const ranking = this.parseAIResponse(rankingResponse);
+
+        finalResults = matched.filter((p: IProductWithOutlet) =>
+          ranking.selected.some(
+            (s: any) => s.productId === p.id && s.outletId === p.outletId
+          )
+        );
+
+        console.log(
+          `[RAG Products & Outlets] Ranked from ${matched.length} to ${finalResults.length}`
+        );
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              tool: "search_products_and_outlets",
+              data: finalResults,
+              message: `Tìm thấy ${finalResults.length} sản phẩm và cửa hàng phù hợp`,
+              searchMethod:
+                ragResults.length > 0 ? "vector_search" : "keyword_fallback",
+              totalFound: searchResults.length,
+            }),
+          },
+        ],
+      };
+    } catch (error: any) {
+      console.error("[RAG Search Products & Outlets Error]", error);
       return {
         content: [
           {
@@ -556,84 +688,13 @@ Nếu không tìm thấy cửa hàng phù hợp, trả về matchedOutlets = []`
             text: JSON.stringify({
               success: false,
               tool: "search_products_and_outlets",
-              error:
-                "Không tìm thấy sản phẩm hoặc cửa hàng nào trong cơ sở dữ liệu.",
+              error: error.message,
+              message: "Lỗi khi tìm kiếm sản phẩm và cửa hàng",
             }),
           },
         ],
       };
     }
-
-    const candidates = this.prefilterProductsWithOutlets(
-      allProductsAndOutlets,
-      query,
-      McpToolsHandler.MAX_PRODUCTS_FOR_LLM
-    );
-
-    const matchPrompt = `Bạn là trợ lý AI giúp tìm kiếm sản phẩm và cửa hàng phù hợp nhất dựa trên câu hỏi và ngữ cảnh hội thoại.
-
-  Ngữ cảnh hội thoại trước đó (nếu có):
-  ${this.trimContext(conversationContext)}
-  Câu hỏi hiện tại của khách: "${query}"
-
-  DANH SÁCH SẢN PHẨM VÀ CỬA HÀNG:
-  ${JSON.stringify(
-    candidates.map((p: IProductWithOutlet) => ({
-      productId: p.id,
-      productName: p.name,
-      price: p.price,
-      quantity: p.quantity,
-      outletId: p.outletId,
-      outletName: p.outletName,
-      outletAddress: p.outletAddress,
-    }))
-  )}
-
-  YÊU CẦU:
-  1. Phân tích câu hỏi và ngữ cảnh để xác định các sản phẩm và cửa hàng phù hợp nhất với nhu cầu của khách.
-  2. Nếu khách hỏi về sản phẩm cụ thể, hoặc dùng đại từ ("cái này", "nó", "cái đó"), hãy dựa vào ngữ cảnh để xác định sản phẩm và cửa hàng.
-  3. Trích xuất các từ khóa tìm kiếm chính từ câu hỏi.
-
-  KẾT QUẢ:
-  Trả về JSON với format sau:
-  {
-    "matchedProductsAndOutlets": [
-    { "productId": id, "outletId": id },
-    ...
-    ],
-    "keywords": ["từ khóa tìm được"],
-    "reason": "giải thích lý do chọn các sản phẩm và cửa hàng này"
-  }
-  Nếu không tìm thấy sản phẩm hoặc cửa hàng phù hợp, trả về matchedProductsAndOutlets = []`;
-
-    const matchResponse = await this.askWithTimeout(
-      agent,
-      "gemini-2.5-flash",
-      matchPrompt
-    );
-    const matchResult = this.parseAIResponse(matchResponse);
-
-    const matched = allProductsAndOutlets.filter((p: IProductWithOutlet) =>
-      matchResult.matchedProductsAndOutlets.some(
-        (m: any) => m.productId === p.id && m.outletId === p.outletId
-      )
-    );
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            success: true,
-            tool: "search_products_and_outlets",
-            data: matched,
-            keywords: matchResult.keywords,
-            message: `Tìm thấy ${matched.length} sản phẩm và cửa hàng phù hợp`,
-            reason: matchResult.reason,
-          }),
-        },
-      ],
-    };
   }
 
   private async handleCreateOrder(args: any) {
@@ -659,7 +720,7 @@ Nếu không tìm thấy cửa hàng phù hợp, trả về matchedOutlets = []`
       }
 
       const extractPrompt = `Phân tích yêu cầu của người dùng dựa trên ngữ cảnh hội thoại.
-${this.trimContext(conversationContext)}
+${conversationContext}
 
 YÊU CẦU HIỆN TẠI: "${message}"
 
@@ -702,8 +763,7 @@ Trả về JSON theo format:
 
 Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
 
-      const extractResponse = await this.askWithTimeout(
-        agent,
+      const extractResponse = await agent.ask(
         "gemini-2.5-flash",
         extractPrompt
       );
@@ -1038,7 +1098,7 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
     }
 
     const prompt = `Bạn là trợ lý cửa hàng thân thiện và thông minh.
-${this.trimContext(conversationContext)}
+${conversationContext}
 
 Dựa vào LỊCH SỬ HỘI THOẠI và kết quả tool, hãy tạo câu trả lời tự nhiên, mạch lạc.
 
@@ -1058,6 +1118,6 @@ HƯỚNG DẪN:
 
 Trả lời:`;
 
-    return await this.askWithTimeout(agent, "gemini-2.5-flash", prompt);
+    return await agent.ask("gemini-2.5-flash", prompt);
   }
 }

@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "dev:stdio": "tsx src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "index:products-outlets": "tsx src/scripts/indexProductsOutlets.ts"
   },
   "dependencies": {
     "@google/genai": "^1.21.0",
     "@modelcontextprotocol/sdk": "^1.4.0",
+    "@pinecone-database/pinecone": "^6.1.2",
     "@types/cors": "^2.8.19",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
