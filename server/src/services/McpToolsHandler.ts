@@ -19,6 +19,92 @@ export class McpToolsHandler {
     this.registerCallToolHandler();
   }
 
+  private static readonly DEFAULT_LLM_TIMEOUT_MS = 15000;
+  private static readonly MAX_CONTEXT_CHARS = 1800;
+  private static readonly MAX_PRODUCTS_FOR_LLM = 40;
+  private static readonly MAX_OUTLETS_FOR_LLM = 40;
+
+  private trimContext(
+    ctx: string,
+    max = McpToolsHandler.MAX_CONTEXT_CHARS
+  ): string {
+    if (!ctx) return "";
+    if (ctx.length <= max) return ctx;
+    return ctx.slice(-max);
+  }
+
+  private normalize(text: string): string {
+    return (text || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  }
+
+  private simpleScore(haystack: string, query: string): number {
+    const h = this.normalize(haystack);
+    const tokens = this.normalize(query)
+      .split(/\s+/)
+      .filter((t) => t && t.length > 1);
+    let score = 0;
+    for (const t of tokens) if (h.includes(t)) score++;
+    return score;
+  }
+
+  private prefilterProductsWithOutlets(
+    items: IProductWithOutlet[],
+    query: string,
+    limit = McpToolsHandler.MAX_PRODUCTS_FOR_LLM
+  ): IProductWithOutlet[] {
+    if (!items?.length) return [];
+    const scored = items
+      .filter((p) => (p.quantity ?? 0) > 0)
+      .map((p) => {
+        const score =
+          this.simpleScore(
+            `${p.name} ${p.outletName} ${p.outletAddress ?? ""}`,
+            query
+          ) + (this.simpleScore(String(p.price ?? ""), query) > 0 ? 0.2 : 0);
+        return { p, score };
+      })
+      .sort((a, b) => b.score - a.score);
+    const top = scored
+      .filter((s) => s.score > 0)
+      .slice(0, limit)
+      .map((s) => s.p);
+    return top.length > 0 ? top : items.slice(0, limit);
+  }
+
+  private prefilterOutlets(
+    outlets: { id: number; name: string; address?: string }[],
+    query: string,
+    limit = McpToolsHandler.MAX_OUTLETS_FOR_LLM
+  ) {
+    if (!outlets?.length) return [];
+    const scored = outlets
+      .map((o) => ({
+        o,
+        score: this.simpleScore(`${o.name} ${o.address ?? ""}`, query),
+      }))
+      .sort((a, b) => b.score - a.score);
+    const top = scored
+      .filter((s) => s.score > 0)
+      .slice(0, limit)
+      .map((s) => s.o);
+    return top.length > 0 ? top : outlets.slice(0, limit);
+  }
+
+  private async askWithTimeout(
+    agent: any,
+    model: string,
+    prompt: string,
+    timeoutMs = McpToolsHandler.DEFAULT_LLM_TIMEOUT_MS
+  ): Promise<string> {
+    const timeoutPromise = new Promise<string>((_, reject) =>
+      setTimeout(() => reject(new Error("LLM request timed out")), timeoutMs)
+    );
+    return Promise.race([agent.ask(model, prompt), timeoutPromise]);
+  }
+
   private registerListToolsHandler(): void {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
@@ -208,7 +294,7 @@ export class McpToolsHandler {
 
     const prompt = `Bạn là trợ lý thông minh cho cửa hàng thương mại điện tử. 
     Phân tích câu hỏi của người dùng dựa trên TOÀN BỘ NGỮ CẢNH hội thoại và quyết định tool phù hợp nhất.
-    ${conversationContext}
+  ${this.trimContext(conversationContext)}
 
     TOOLS có sẵn:
     1. search_products: Tìm kiếm sản phẩm (khi user hỏi về sản phẩm, muốn xem, tìm kiếm)
@@ -246,7 +332,11 @@ export class McpToolsHandler {
 
     Câu hỏi hiện tại của người dùng: "${message}"`;
 
-    const response = await agent.ask("gemini-2.5-flash", prompt);
+    const response = await this.askWithTimeout(
+      agent,
+      "gemini-2.5-flash",
+      prompt
+    );
     const analysis = this.parseAIResponse(response);
 
     console.log("[Analyze Intent] Response:", analysis);
@@ -288,14 +378,20 @@ export class McpToolsHandler {
       };
     }
 
+    const candidates = this.prefilterProductsWithOutlets(
+      allProductsWithOutlets,
+      query,
+      McpToolsHandler.MAX_PRODUCTS_FOR_LLM
+    );
+
     const matchPrompt = `Dựa vào câu hỏi và ngữ cảnh hội thoại, tìm sản phẩm phù hợp nhất.
-${conversationContext}
+${this.trimContext(conversationContext)}
 
 Câu hỏi hiện tại: "${query}"
 
 Danh sách sản phẩm (có thể trùng tên ở nhiều cửa hàng):
 ${JSON.stringify(
-  allProductsWithOutlets.map((p: IProductWithOutlet) => ({
+  candidates.map((p: IProductWithOutlet) => ({
     id: p.id,
     name: p.name,
     price: p.price,
@@ -318,14 +414,26 @@ Tìm các sản phẩm phù hợp và trả về JSON:
 Chỉ trả về những sản phẩm có quantity > 0.
 Nếu không tìm thấy sản phẩm phù hợp, trả về matchedProducts = []`;
 
-    const matchResponse = await agent.ask("gemini-2.5-flash", matchPrompt);
+    const matchResponse = await this.askWithTimeout(
+      agent,
+      "gemini-2.5-flash",
+      matchPrompt
+    );
     const matchResult = this.parseAIResponse(matchResponse);
+
+    interface IMatchProduct {
+      productId: number;
+      outletId: number;
+    }
+
+    const matchProducts = matchResult.matchedProducts as IMatchProduct[];
 
     const matchedProducts = allProductsWithOutlets.filter(
       (p: IProductWithOutlet) =>
-        p.quantity > 0 &&
-        matchResult.matchedProducts.some(
-          (m: any) => m.productId === p.id && m.outletId === p.outletId
+        (p.quantity ?? 0) > 0 &&
+        matchProducts?.some(
+          (m: IMatchProduct) =>
+            m.productId === p.id && m.outletId === p.outletId
         )
     );
 
@@ -377,20 +485,20 @@ Nếu không tìm thấy sản phẩm phù hợp, trả về matchedProducts = [
       };
     }
 
+    const limitedOutlets = this.prefilterOutlets(
+      allOulets.map((o) => ({ id: o.id, name: o.name, address: o.address })),
+      query,
+      McpToolsHandler.MAX_OUTLETS_FOR_LLM
+    );
+
     const matchPrompt = `Bạn là trợ lý AI giúp tìm kiếm cửa hàng phù hợp cho khách hàng dựa trên câu hỏi và ngữ cảnh hội thoại.
 
 Ngữ cảnh hội thoại trước đó (nếu có):
-${conversationContext}
+${this.trimContext(conversationContext)}
 Câu hỏi hiện tại của khách: "${query}"
 
 DANH SÁCH CỬA HÀNG:
-${JSON.stringify(
-  allOulets.map((o) => ({
-    id: o.id,
-    name: o.name,
-    address: o.address,
-  }))
-)}
+${JSON.stringify(limitedOutlets)}
 
 YÊU CẦU:
 1. Phân tích câu hỏi và ngữ cảnh để xác định các cửa hàng phù hợp nhất với nhu cầu của khách.
@@ -405,7 +513,11 @@ Trả về JSON với format sau:
 }
 Nếu không tìm thấy cửa hàng phù hợp, trả về matchedOutlets = []`;
 
-    const matchResponse = await agent.ask("gemini-2.5-flash", matchPrompt);
+    const matchResponse = await this.askWithTimeout(
+      agent,
+      "gemini-2.5-flash",
+      matchPrompt
+    );
     const matchResult = this.parseAIResponse(matchResponse);
 
     const matchedOutlets = allOulets.filter((o) =>
@@ -452,15 +564,21 @@ Nếu không tìm thấy cửa hàng phù hợp, trả về matchedOutlets = []`
       };
     }
 
+    const candidates = this.prefilterProductsWithOutlets(
+      allProductsAndOutlets,
+      query,
+      McpToolsHandler.MAX_PRODUCTS_FOR_LLM
+    );
+
     const matchPrompt = `Bạn là trợ lý AI giúp tìm kiếm sản phẩm và cửa hàng phù hợp nhất dựa trên câu hỏi và ngữ cảnh hội thoại.
 
   Ngữ cảnh hội thoại trước đó (nếu có):
-  ${conversationContext}
+  ${this.trimContext(conversationContext)}
   Câu hỏi hiện tại của khách: "${query}"
 
   DANH SÁCH SẢN PHẨM VÀ CỬA HÀNG:
   ${JSON.stringify(
-    allProductsAndOutlets.map((p: IProductWithOutlet) => ({
+    candidates.map((p: IProductWithOutlet) => ({
       productId: p.id,
       productName: p.name,
       price: p.price,
@@ -488,7 +606,11 @@ Nếu không tìm thấy cửa hàng phù hợp, trả về matchedOutlets = []`
   }
   Nếu không tìm thấy sản phẩm hoặc cửa hàng phù hợp, trả về matchedProductsAndOutlets = []`;
 
-    const matchResponse = await agent.ask("gemini-2.5-flash", matchPrompt);
+    const matchResponse = await this.askWithTimeout(
+      agent,
+      "gemini-2.5-flash",
+      matchPrompt
+    );
     const matchResult = this.parseAIResponse(matchResponse);
 
     const matched = allProductsAndOutlets.filter((p: IProductWithOutlet) =>
@@ -537,7 +659,7 @@ Nếu không tìm thấy cửa hàng phù hợp, trả về matchedOutlets = []`
       }
 
       const extractPrompt = `Phân tích yêu cầu của người dùng dựa trên ngữ cảnh hội thoại.
-${conversationContext}
+${this.trimContext(conversationContext)}
 
 YÊU CẦU HIỆN TẠI: "${message}"
 
@@ -580,7 +702,8 @@ Trả về JSON theo format:
 
 Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
 
-      const extractResponse = await agent.ask(
+      const extractResponse = await this.askWithTimeout(
+        agent,
         "gemini-2.5-flash",
         extractPrompt
       );
@@ -841,12 +964,23 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
   }
 
   private parseAIResponse(response: string): any {
-    console.log(response);
-    const cleaned = response
-      .replace(/```json\n?/g, "")
-      .replace(/```\n?/g, "")
-      .trim();
-    return JSON.parse(cleaned);
+    try {
+      const cleaned = response
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
+      return JSON.parse(cleaned);
+    } catch (e1) {
+      try {
+        const start = response.indexOf("{");
+        const end = response.lastIndexOf("}");
+        if (start !== -1 && end !== -1 && end > start) {
+          const candidate = response.slice(start, end + 1);
+          return JSON.parse(candidate);
+        }
+      } catch (e2) {}
+      throw new Error("Failed to parse AI JSON response");
+    }
   }
 
   private async handleGenerateFinalResponse(args: any) {
@@ -904,7 +1038,7 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
     }
 
     const prompt = `Bạn là trợ lý cửa hàng thân thiện và thông minh.
-${conversationContext}
+${this.trimContext(conversationContext)}
 
 Dựa vào LỊCH SỬ HỘI THOẠI và kết quả tool, hãy tạo câu trả lời tự nhiên, mạch lạc.
 
@@ -924,6 +1058,6 @@ HƯỚNG DẪN:
 
 Trả lời:`;
 
-    return await agent.ask("gemini-2.5-flash", prompt);
+    return await this.askWithTimeout(agent, "gemini-2.5-flash", prompt);
   }
 }
