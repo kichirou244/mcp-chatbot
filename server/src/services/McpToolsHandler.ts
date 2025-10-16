@@ -5,7 +5,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { createServices } from "./index.js";
 import { AiAgentFactory } from "../aiAgents/aiAgentFactory";
-import { IProduct } from "../models/Product.js";
+import { IProduct, IProductWithOutlet } from "../models/Product.js";
 import { JwtUtility } from "../utils/jwtUtility";
 
 export class McpToolsHandler {
@@ -26,13 +26,51 @@ export class McpToolsHandler {
           {
             name: "search_products",
             description:
-              "Tìm kiếm sản phẩm trong cửa hàng dựa trên từ khóa hoặc tiêu chí",
+              "Tìm kiếm sản phẩm trong các cửa hàng dựa trên từ khóa hoặc tiêu chí",
             inputSchema: {
               type: "object",
               properties: {
                 query: {
                   type: "string",
                   description: "Câu hỏi hoặc từ khóa tìm kiếm sản phẩm",
+                },
+                conversationContext: {
+                  type: "string",
+                  description: "Ngữ cảnh hội thoại trước đó (nếu có)",
+                },
+              },
+              required: ["query"],
+            },
+          },
+          {
+            name: "search_outlets",
+            description: "Tìm kiếm cửa hàng dựa trên từ khóa hoặc tiêu chí",
+            inputSchema: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "Câu hỏi hoặc từ khóa tìm kiếm cửa hàng",
+                },
+                conversationContext: {
+                  type: "string",
+                  description: "Ngữ cảnh hội thoại trước đó (nếu có)",
+                },
+              },
+              required: ["query"],
+            },
+          },
+          {
+            name: "search_products_and_outlets",
+            description:
+              "Tìm kiếm sản phẩm và cửa hàng dựa trên từ khóa hoặc tiêu chí",
+            inputSchema: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description:
+                    "Câu hỏi hoặc từ khóa tìm kiếm sản phẩm và cửa hàng",
                 },
                 conversationContext: {
                   type: "string",
@@ -131,6 +169,12 @@ export class McpToolsHandler {
           case "search_products":
             return await this.handleSearchProducts(args);
 
+          case "search_outlets":
+            return await this.handleSearchOutlets(args);
+
+          case "search_products_and_outlets":
+            return await this.handleSearchProductsAndOutlets(args);
+
           case "create_order":
             return await this.handleCreateOrder(args);
 
@@ -163,36 +207,44 @@ export class McpToolsHandler {
     const agent = AiAgentFactory.create("gemini");
 
     const prompt = `Bạn là trợ lý thông minh cho cửa hàng thương mại điện tử. 
-Phân tích câu hỏi của người dùng dựa trên TOÀN BỘ NGỮ CẢNH hội thoại và quyết định tool phù hợp nhất.
-${conversationContext}
+    Phân tích câu hỏi của người dùng dựa trên TOÀN BỘ NGỮ CẢNH hội thoại và quyết định tool phù hợp nhất.
+    ${conversationContext}
 
-TOOLS có sẵn:
-1. search_products: Tìm kiếm sản phẩm (khi user hỏi về sản phẩm, muốn xem, tìm kiếm)
-   - VD: "Có laptop nào không?", "Cho tôi xem điện thoại", "Cái nào rẻ nhất?" (khi đang nói về sản phẩm)
+    TOOLS có sẵn:
+    1. search_products: Tìm kiếm sản phẩm (khi user hỏi về sản phẩm, muốn xem, tìm kiếm)
+     - VD: "Có laptop nào không?", "Cho tôi xem điện thoại", "Cái nào rẻ nhất?" (khi đang nói về sản phẩm)
 
-2. create_order: Tạo đơn hàng (khi user muốn mua, đặt hàng)
-   - VD: "Tôi muốn mua cái này", "Đặt hàng laptop đó", "Mua 2 cái"
-  
-3. none: Không cần tool (chat thông thường, chào hỏi, hỏi thông tin cửa hàng)
-   - VD: "Xin chào", "Cảm ơn", "Shop mở cửa mấy giờ?"
+    2. search_outlets: Tìm kiếm cửa hàng (khi user hỏi về cửa hàng, địa chỉ, vị trí, thông tin cửa hàng)
+     - VD: "Có cửa hàng nào ở Hà Nội không?", "Địa chỉ shop ở đâu?", "Cửa hàng gần nhất là gì?"
 
-LƯU Ý QUAN TRỌNG:
-- Nếu user dùng đại từ như "cái này", "cái đó", "nó", hãy xem lịch sử để hiểu họ đang nói về gì
-- Nếu user hỏi "cái nào rẻ nhất?" và trước đó đang nói về laptop, thì vẫn là search_products cho laptop
-- Nếu user nói "mua cái này" và trước đó đã tìm sản phẩm, thì là create_order
+    3. search_products_and_outlets: Tìm kiếm sản phẩm ở cửa hàng cụ thể hoặc tìm cửa hàng có sản phẩm cụ thể (khi user hỏi về sản phẩm nào ở cửa hàng nào, hoặc cửa hàng nào có sản phẩm gì)
+     - VD: "Ở cửa hàng Hà Nội có những sản phẩm gì?", "Cửa hàng Huế có bán laptop không?", "Tôi muốn mua điện thoại ở cửa hàng Đà Nẵng", "Ở đâu bán iPhone?"
 
-Chỉ trả về JSON với format sau (không thêm markdown):
-{
-  "tool": "tên_tool_hoặc_none",
-  "confidence": 0.95,
-  "params": { 
+    4. create_order: Tạo đơn hàng (khi user muốn mua, đặt hàng)
+     - VD: "Tôi muốn mua cái này", "Đặt hàng laptop đó", "Mua 2 cái"
+    
+    5. none: Không cần tool (chat thông thường, chào hỏi, hỏi thông tin chung)
+     - VD: "Xin chào", "Cảm ơn", "Shop mở cửa mấy giờ?"
+
+    LƯU Ý QUAN TRỌNG:
+    - Nếu user dùng đại từ như "cái này", "cái đó", "nó", hãy xem lịch sử để hiểu họ đang nói về gì
+    - Nếu user hỏi "cái nào rẻ nhất?" và trước đó đang nói về laptop, thì vẫn là search_products cho laptop
+    - Nếu user hỏi về địa chỉ, vị trí, thông tin cửa hàng thì là search_outlets
+    - Nếu user hỏi về sản phẩm ở cửa hàng cụ thể hoặc cửa hàng có sản phẩm cụ thể thì là search_products_and_outlets
+    - Nếu user nói "mua cái này" và trước đó đã tìm sản phẩm, thì là create_order
+
+    Chỉ trả về JSON với format sau (không thêm markdown):
+    {
+    "tool": "tên_tool_hoặc_none",
+    "confidence": 0.95,
+    "params": { 
     "question": "câu hỏi đầy đủ có context",
     "referenceContext": "thông tin từ lịch sử nếu cần"
-  },
-  "reasoning": "lý do chọn tool này dựa trên context"
-}
+    },
+    "reasoning": "lý do chọn tool này dựa trên context"
+    }
 
-Câu hỏi hiện tại của người dùng: "${message}"`;
+    Câu hỏi hiện tại của người dùng: "${message}"`;
 
     const response = await agent.ask("gemini-2.5-flash", prompt);
     const analysis = this.parseAIResponse(response);
@@ -217,9 +269,10 @@ Câu hỏi hiện tại của người dùng: "${message}"`;
     const { query, conversationContext = "" } = args;
     const agent = AiAgentFactory.create("gemini");
 
-    const allProducts = await this.services.productService.getProducts();
+    const allProductsWithOutlets: IProductWithOutlet[] =
+      await this.services.productService.getProductsOutlets();
 
-    if (allProducts.length === 0) {
+    if (allProductsWithOutlets.length === 0) {
       return {
         content: [
           {
@@ -240,33 +293,51 @@ ${conversationContext}
 
 Câu hỏi hiện tại: "${query}"
 
-Danh sách sản phẩm:
+Danh sách sản phẩm (có thể trùng tên ở nhiều cửa hàng):
 ${JSON.stringify(
-  allProducts.map((p: IProduct) => ({
+  allProductsWithOutlets.map((p: IProductWithOutlet) => ({
     id: p.id,
     name: p.name,
     price: p.price,
     quantity: p.quantity,
+    outletId: p.outletId,
+    outletName: p.outletName,
+    outletAddress: p.outletAddress,
   }))
 )}
 
 Tìm các sản phẩm phù hợp và trả về JSON:
 {
-  "matchedProducts": [id1, id2, ...],
+  "matchedProducts": [
+    { "productId": id, "outletId": id }
+  ],
   "keywords": ["từ khóa tìm được"],
   "reason": "lý do match"
 }
 
+Chỉ trả về những sản phẩm có quantity > 0.
 Nếu không tìm thấy sản phẩm phù hợp, trả về matchedProducts = []`;
 
     const matchResponse = await agent.ask("gemini-2.5-flash", matchPrompt);
     const matchResult = this.parseAIResponse(matchResponse);
 
-    const matchedProducts = allProducts.filter((p: IProduct) =>
-      matchResult.matchedProducts.includes(p.id)
+    const matchedProducts = allProductsWithOutlets.filter(
+      (p: IProductWithOutlet) =>
+        p.quantity > 0 &&
+        matchResult.matchedProducts.some(
+          (m: any) => m.productId === p.id && m.outletId === p.outletId
+        )
     );
 
-    console.log("[Search] Match Result:", matchResult);
+    const resultData = matchedProducts.map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      quantity: p.quantity,
+      outletId: p.outletId,
+      outletName: p.outletName,
+      outletAddress: p.outletAddress,
+    }));
 
     return {
       content: [
@@ -275,9 +346,167 @@ Nếu không tìm thấy sản phẩm phù hợp, trả về matchedProducts = [
           text: JSON.stringify({
             success: true,
             tool: "search_products",
-            data: matchedProducts,
+            data: resultData,
             keywords: matchResult.keywords,
-            message: `Tìm thấy ${matchedProducts.length} sản phẩm phù hợp`,
+            message: `Tìm thấy ${resultData.length} sản phẩm phù hợp`,
+            reason: matchResult.reason,
+          }),
+        },
+      ],
+    };
+  }
+
+  private async handleSearchOutlets(args: any) {
+    const { query, conversationContext = "" } = args;
+    const agent = AiAgentFactory.create("gemini");
+
+    const allOulets = await this.services.outletService.getOutlets();
+
+    if (allOulets.length === 0) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: false,
+              tool: "search_outlets",
+              error: "Không tìm thấy cửa hàng nào trong cơ sở dữ liệu.",
+            }),
+          },
+        ],
+      };
+    }
+
+    const matchPrompt = `Bạn là trợ lý AI giúp tìm kiếm cửa hàng phù hợp cho khách hàng dựa trên câu hỏi và ngữ cảnh hội thoại.
+
+Ngữ cảnh hội thoại trước đó (nếu có):
+${conversationContext}
+Câu hỏi hiện tại của khách: "${query}"
+
+DANH SÁCH CỬA HÀNG:
+${JSON.stringify(
+  allOulets.map((o) => ({
+    id: o.id,
+    name: o.name,
+    address: o.address,
+  }))
+)}
+
+YÊU CẦU:
+1. Phân tích câu hỏi và ngữ cảnh để xác định các cửa hàng phù hợp nhất với nhu cầu của khách.
+2. Nếu khách hỏi về cửa hàng cụ thể, hoặc dùng đại từ ("cửa hàng này", "nó", "cái đó"), hãy dựa vào ngữ cảnh để xác định cửa hàng.
+3. Trích xuất các từ khóa tìm kiếm chính từ câu hỏi.
+KẾT QUẢ:
+Trả về JSON với format sau:
+{
+  "matchedOutlets": [id1, id2, ...]
+  "keywords": ["từ khóa tìm được"],
+  "reason": "giải thích lý do chọn các cửa hàng này"
+}
+Nếu không tìm thấy cửa hàng phù hợp, trả về matchedOutlets = []`;
+
+    const matchResponse = await agent.ask("gemini-2.5-flash", matchPrompt);
+    const matchResult = this.parseAIResponse(matchResponse);
+
+    const matchedOutlets = allOulets.filter((o) =>
+      matchResult.matchedOutlets.includes(o.id)
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            success: true,
+            tool: "search_outlets",
+            data: matchedOutlets,
+            keywords: matchResult.keywords,
+            message: `Tìm thấy ${matchedOutlets.length} cửa hàng phù hợp`,
+            reason: matchResult.reason,
+          }),
+        },
+      ],
+    };
+  }
+
+  private async handleSearchProductsAndOutlets(args: any) {
+    const { query, conversationContext = "" } = args;
+    const agent = AiAgentFactory.create("gemini");
+
+    const allProductsAndOutlets =
+      await this.services.productService.getProductsOutlets();
+
+    if (allProductsAndOutlets.length === 0) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: false,
+              tool: "search_products_and_outlets",
+              error:
+                "Không tìm thấy sản phẩm hoặc cửa hàng nào trong cơ sở dữ liệu.",
+            }),
+          },
+        ],
+      };
+    }
+
+    const matchPrompt = `Bạn là trợ lý AI giúp tìm kiếm sản phẩm và cửa hàng phù hợp nhất dựa trên câu hỏi và ngữ cảnh hội thoại.
+
+  Ngữ cảnh hội thoại trước đó (nếu có):
+  ${conversationContext}
+  Câu hỏi hiện tại của khách: "${query}"
+
+  DANH SÁCH SẢN PHẨM VÀ CỬA HÀNG:
+  ${JSON.stringify(
+    allProductsAndOutlets.map((p: IProductWithOutlet) => ({
+      productId: p.id,
+      productName: p.name,
+      price: p.price,
+      quantity: p.quantity,
+      outletId: p.outletId,
+      outletName: p.outletName,
+      outletAddress: p.outletAddress,
+    }))
+  )}
+
+  YÊU CẦU:
+  1. Phân tích câu hỏi và ngữ cảnh để xác định các sản phẩm và cửa hàng phù hợp nhất với nhu cầu của khách.
+  2. Nếu khách hỏi về sản phẩm cụ thể, hoặc dùng đại từ ("cái này", "nó", "cái đó"), hãy dựa vào ngữ cảnh để xác định sản phẩm và cửa hàng.
+  3. Trích xuất các từ khóa tìm kiếm chính từ câu hỏi.
+
+  KẾT QUẢ:
+  Trả về JSON với format sau:
+  {
+    "matchedProductsAndOutlets": [
+    { "productId": id, "outletId": id },
+    ...
+    ],
+    "keywords": ["từ khóa tìm được"],
+    "reason": "giải thích lý do chọn các sản phẩm và cửa hàng này"
+  }
+  Nếu không tìm thấy sản phẩm hoặc cửa hàng phù hợp, trả về matchedProductsAndOutlets = []`;
+
+    const matchResponse = await agent.ask("gemini-2.5-flash", matchPrompt);
+    const matchResult = this.parseAIResponse(matchResponse);
+
+    const matched = allProductsAndOutlets.filter((p: IProductWithOutlet) =>
+      matchResult.matchedProductsAndOutlets.some(
+        (m: any) => m.productId === p.id && m.outletId === p.outletId
+      )
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            success: true,
+            tool: "search_products_and_outlets",
+            data: matched,
+            keywords: matchResult.keywords,
+            message: `Tìm thấy ${matched.length} sản phẩm và cửa hàng phù hợp`,
             reason: matchResult.reason,
           }),
         },

@@ -1,4 +1,6 @@
 import { dbPool } from "../config/database";
+import { IOrder, IOrderResponse } from "../models/Order";
+import { IOrderDetailResponse } from "../models/OrderDetail";
 import { IProduct } from "../models/Product";
 import { AppError } from "../utils/errors";
 import { UserService } from "./UserService";
@@ -130,6 +132,56 @@ export class OrderService {
       if (connection) {
         connection.release();
       }
+    }
+  }
+
+  async getOrders(): Promise<IOrderResponse[]> {
+    let connection;
+
+    try {
+      connection = await dbPool.getConnection();
+
+      const [orderRows] = await connection.query(
+        "SELECT id, user_id AS userId, date, total_amount AS totalAmount, status FROM orders"
+      );
+      const orders = orderRows as IOrder[];
+
+      const [detailRows] = await connection.query(
+        `SELECT od.id, od.order_id AS orderId, od.product_id AS productId, od.quantity, od.unit_price AS unitPrice, p.name AS productName, p.description AS productDescription
+         FROM order_details od
+         LEFT JOIN products p ON od.product_id = p.id`
+      );
+
+      const orderDetails = detailRows as Array<IOrderDetailResponse>;
+
+      const ordersWithDetails: IOrderResponse[] = orders.map((o) => {
+        const detailsForOrder = orderDetails
+          .filter((d) => d.orderId === o.id)
+          .map((d) => ({
+            id: d.id,
+            productId: d.productId,
+            productName: d.productName,
+            productDescription: d.productDescription,
+            quantity: d.quantity,
+            unitPrice: d.unitPrice,
+            subtotal: d.unitPrice * d.quantity,
+          }));
+
+        return {
+          orderId: o.id,
+          userId: o.userId,
+          totalAmount: o.totalAmount,
+          date: o.date,
+          status: o.status,
+          orderDetails: detailsForOrder,
+        } as IOrderResponse;
+      });
+
+      return ordersWithDetails;
+    } catch (error) {
+      throw new AppError(`Failed to retrieve orders: ${error}`, 500);
+    } finally {
+      if (connection) connection.release();
     }
   }
 }

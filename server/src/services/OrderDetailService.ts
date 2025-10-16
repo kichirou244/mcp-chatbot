@@ -1,5 +1,5 @@
 import { dbPool } from "../config/database";
-import { IOrderDetailCreate } from "../models/OrderDetail";
+import { IOrderDetail, IOrderDetailCreate } from "../models/OrderDetail";
 import { AppError } from "../utils/errors";
 import { ProductService } from "./ProductService";
 

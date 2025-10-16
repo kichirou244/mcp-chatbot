@@ -6,3 +6,8 @@ export interface IProduct {
     price: number;
     quantity: number;
 }
+
+export interface IProductWithOutlet extends IProduct {
+    outletName: string;
+    outletAddress: string;
+}

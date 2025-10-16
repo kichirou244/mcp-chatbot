@@ -7,7 +7,9 @@
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "cd client && npm run dev",
     "dev:server": "cd server && npm run dev",
-    "install:all": "npm install && cd client && npm install && cd ../server && npm install"
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
+    "build:server": "cd server && npm run build",
+    "dev:stdio": "cd server && npm run dev:stdio"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

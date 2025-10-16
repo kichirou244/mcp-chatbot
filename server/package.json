@@ -2,9 +2,10 @@
   "name": "mcp-server",
   "version": "1.0.0",
   "description": "MCP Server",
-  "main": "dist/server.js",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:stdio": "tsx src/index.ts",
     "build": "tsc"
   },
   "dependencies": {

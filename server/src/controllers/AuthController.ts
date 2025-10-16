@@ -1,6 +1,6 @@
 import { createServices } from "./../services/index";
 import { Request, Response } from "express";
-import { IUserCreate, IUserLogin } from "../models/User";
+import { IAuthResponse, IUserCreate, IUserLogin } from "../models/User";
 
 export class AuthController {
   private services = createServices();
@@ -50,24 +50,30 @@ export class AuthController {
   }
 
   async getMe(req: Request, res: Response): Promise<void> {
-    const accessToken = req.headers.authorization?.split(" ")[1];
+    const userPayload = (req as any).user;
 
-    if (!accessToken) {
+    if (!userPayload || !userPayload.id) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
     try {
-      const user = await this.services.userService.getMe(accessToken);
+      const user = await this.services.userService.getUserById(userPayload.id);
 
       if (!user) {
         res.status(404).json({ error: "User not found" });
         return;
       }
 
+      const data = {
+        id: user.id,
+        username: user.username,
+        accessToken: (req as any).token,
+      } as IAuthResponse;
+
       res.status(200).json({
         message: "Lấy thông tin người dùng thành công",
-        data: user,
+        data: data,
       });
     } catch (error) {
       console.error("Error fetching user:", error);

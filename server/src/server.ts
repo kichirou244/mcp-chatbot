@@ -4,7 +4,10 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import cors from "cors";
 
 import productRoutes from "./routes/productRoutes";
+import orderRoutes from "./routes/orderRoutes";
+import outletRoutes from "./routes/outletRoutes";
 import authRoutes from "./routes/authRoutes";
+
 import { createServices } from "./services/index.js";
 import { McpResourcesHandler } from "./services/McpResourcesHandler.js";
 import { McpToolsHandler } from "./services/McpToolsHandler.js";
@@ -84,6 +87,8 @@ router.get("/connect", async (req: Request, res: Response) => {
 
 app.use("/", router);
 app.use("/product", productRoutes);
+app.use("/order", orderRoutes);
+app.use("/outlet", outletRoutes);
 app.use("/auth", authRoutes);
 
 const PORT = 8080;
