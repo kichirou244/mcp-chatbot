@@ -1,11 +1,34 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { mcpClient } from "./client";
 import HomePage from "./pages/Home";
 import AuthPage from "./pages/Auth";
+import CmsDashboard from "./pages/Cms/Dashboard";
+import CmsProducts from "./pages/Cms/Products";
+import CmsOrders from "./pages/Cms/Orders";
+import CmsOutlets from "./pages/Cms/Outlets";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:8080";
+
+const GuestRoute: React.FC<{ children: React.ReactElement }> = ({
+  children,
+}) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (!isLoading)
+    return isAuthenticated ? <Navigate to="/" replace /> : children;
+};
+
+const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({
+  children,
+}) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (!isLoading)
+    return isAuthenticated ? children : <Navigate to="/auth" replace />;
+};
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -53,14 +76,56 @@ const App: React.FC = () => {
   }
 
   return (
-    <NotificationProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/auth" element={<AuthPage />} />
-        </Routes>
-      </BrowserRouter>
-    </NotificationProvider>
+    <AuthProvider>
+      <NotificationProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route
+              path="/auth"
+              element={
+                <GuestRoute>
+                  <AuthPage />
+                </GuestRoute>
+              }
+            />
+
+            <Route
+              path="/cms"
+              element={
+                <ProtectedRoute>
+                  <CmsDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cms/products"
+              element={
+                <ProtectedRoute>
+                  <CmsProducts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cms/orders"
+              element={
+                <ProtectedRoute>
+                  <CmsOrders />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cms/outlets"
+              element={
+                <ProtectedRoute>
+                  <CmsOutlets />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+      </NotificationProvider>
+    </AuthProvider>
   );
 };
 

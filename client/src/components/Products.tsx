@@ -12,8 +12,8 @@ export function Products() {
       setLoading(true);
       setError(null);
 
-      const data = await getProducts();
-      setProducts(data);
+      const response = await getProducts();
+      if (response.ok) setProducts(response.data);
     } catch (err: any) {
       console.error("[COMPONENT] Error:", err);
       setError(err?.message || "Failed to fetch products");
@@ -65,28 +65,30 @@ export function Products() {
           <p className="text-gray-500 text-lg">Không có sản phẩm nào</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 overflow-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 flex-1 overflow-auto">
           {products.map((product) => (
             <div
               key={product.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+              className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm transition-shadow flex flex-col h-full"
             >
               <div className="flex justify-between items-start mb-2">
                 <h2 className="font-semibold text-lg text-gray-800">
                   {product.name}
                 </h2>
               </div>
-              <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+              <p className="text-gray-600 text-sm mb-2 line-clamp-2 flex-1">
                 {product.description}
               </p>
-              <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+              <div className="flex justify-between items-center pt-2 border-t border-gray-100 mt-auto">
                 <p className="text-xl font-bold text-green-600">
-                  {product.price} vnđ
+                  {product.price.toLocaleString("vi-VN")} vnđ
                 </p>
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Số lượng</p>
-                  <p className="text-base font-semibold text-gray-700">
-                    {product.quantity}
+                  <p className="text-xs text-gray-500">
+                    SL:{" "}
+                    <a className="text-lg text-gray-700 font-bold">
+                      {product.quantity}
+                    </a>
                   </p>
                 </div>
               </div>

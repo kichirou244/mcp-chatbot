@@ -184,4 +184,328 @@ export class OrderService {
       if (connection) connection.release();
     }
   }
+
+  async getOrderById(orderId: number): Promise<IOrderResponse | null> {
+    let connection;
+
+    try {
+      connection = await dbPool.getConnection();
+
+      const [orderRows] = await connection.query(
+        "SELECT id, user_id AS userId, date, total_amount AS totalAmount, status FROM orders WHERE id = ?",
+        [orderId]
+      );
+      const orders = orderRows as IOrder[];
+
+      if (orders.length === 0) {
+        return null;
+      }
+
+      const order = orders[0];
+
+      const [detailRows] = await connection.query(
+        `SELECT od.id, od.order_id AS orderId, od.product_id AS productId, od.quantity, od.unit_price AS unitPrice, p.name AS productName, p.description AS productDescription
+         FROM order_details od
+         LEFT JOIN products p ON od.product_id = p.id
+         WHERE od.order_id = ?`,
+        [orderId]
+      );
+
+      const orderDetails = (detailRows as Array<IOrderDetailResponse>).map(
+        (d) => ({
+          id: d.id,
+          productId: d.productId,
+          productName: d.productName,
+          productDescription: d.productDescription,
+          quantity: d.quantity,
+          unitPrice: d.unitPrice,
+          subtotal: d.unitPrice * d.quantity,
+        })
+      );
+
+      return {
+        orderId: order.id,
+        userId: order.userId,
+        totalAmount: order.totalAmount,
+        date: order.date,
+        status: order.status,
+        orderDetails,
+      } as IOrderResponse;
+    } catch (error) {
+      throw new AppError(`Failed to retrieve order: ${error}`, 500);
+    } finally {
+      if (connection) connection.release();
+    }
+  }
+
+  async updateOrder(
+    orderId: number,
+    updateData: {
+      status?: string;
+      orderDetails?: Array<{
+        id?: number;
+        productId: number;
+        quantity: number;
+        unitPrice: number;
+      }>;
+    }
+  ): Promise<IOrderResponse> {
+    let connection;
+    try {
+      connection = await dbPool.getConnection();
+      await connection.beginTransaction();
+
+      const existingOrder = await this.getOrderById(orderId);
+      if (!existingOrder) {
+        throw new AppError("Đơn hàng không tồn tại", 404);
+      }
+
+      if (updateData.status) {
+        await connection.execute("UPDATE orders SET status = ? WHERE id = ?", [
+          updateData.status,
+          orderId,
+        ]);
+      }
+
+      if (updateData.orderDetails) {
+        const [currentDetailsRows] = await connection.query(
+          "SELECT product_id AS productId, quantity FROM order_details WHERE order_id = ?",
+          [orderId]
+        );
+        const currentDetails = currentDetailsRows as Array<{
+          productId: number;
+          quantity: number;
+        }>;
+
+        for (const detail of currentDetails) {
+          await connection.execute(
+            "UPDATE products SET quantity = quantity + ? WHERE id = ?",
+            [detail.quantity, detail.productId]
+          );
+        }
+
+        await connection.execute(
+          "DELETE FROM order_details WHERE order_id = ?",
+          [orderId]
+        );
+
+        let totalAmount = 0;
+        for (const detail of updateData.orderDetails) {
+          const [productRows] = await connection.query(
+            "SELECT * FROM products WHERE id = ?",
+            [detail.productId]
+          );
+          const products = productRows as IProduct[];
+
+          if (products.length === 0) {
+            throw new AppError(
+              `Sản phẩm có ID ${detail.productId} không tồn tại`,
+              404
+            );
+          }
+
+          const product = products[0];
+
+          if (product.quantity < detail.quantity) {
+            throw new AppError(
+              `Sản phẩm "${product.name}" không đủ số lượng. Còn lại: ${product.quantity}, yêu cầu: ${detail.quantity}`,
+              400
+            );
+          }
+
+          await connection.execute(
+            "INSERT INTO order_details (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
+            [orderId, detail.productId, detail.quantity, detail.unitPrice]
+          );
+
+          await connection.execute(
+            "UPDATE products SET quantity = quantity - ? WHERE id = ?",
+            [detail.quantity, detail.productId]
+          );
+
+          totalAmount += detail.unitPrice * detail.quantity;
+        }
+
+        await connection.execute(
+          "UPDATE orders SET total_amount = ? WHERE id = ?",
+          [totalAmount, orderId]
+        );
+      }
+
+      await connection.commit();
+
+      const updatedOrder = await this.getOrderById(orderId);
+      if (!updatedOrder) {
+        throw new AppError(
+          "Không thể lấy thông tin đơn hàng sau khi cập nhật",
+          500
+        );
+      }
+
+      return updatedOrder;
+    } catch (error) {
+      if (connection) {
+        await connection.rollback();
+      }
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(`Failed to update order: ${error}`, 500);
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+
+  async deleteOrder(orderId: number): Promise<void> {
+    let connection;
+    try {
+      connection = await dbPool.getConnection();
+      await connection.beginTransaction();
+
+      const [detailRows] = await connection.query(
+        "SELECT product_id AS productId, quantity FROM order_details WHERE order_id = ?",
+        [orderId]
+      );
+      const orderDetails = detailRows as Array<{
+        productId: number;
+        quantity: number;
+      }>;
+
+      for (const detail of orderDetails) {
+        await connection.execute(
+          "UPDATE products SET quantity = quantity + ? WHERE id = ?",
+          [detail.quantity, detail.productId]
+        );
+      }
+
+      await connection.execute("DELETE FROM order_details WHERE order_id = ?", [
+        orderId,
+      ]);
+
+      const [result] = await connection.execute(
+        "DELETE FROM orders WHERE id = ?",
+        [orderId]
+      );
+
+      if ((result as any).affectedRows === 0) {
+        throw new AppError("Đơn hàng không tồn tại", 404);
+      }
+
+      await connection.commit();
+    } catch (error) {
+      if (connection) {
+        await connection.rollback();
+      }
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(`Failed to delete order: ${error}`, 500);
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+
+  async getTopProducts(limit: number = 5): Promise<
+    Array<{
+      productId: number;
+      productName: string;
+      productDescription: string;
+      totalQuantitySold: number;
+      totalRevenue: number;
+      orderCount: number;
+    }>
+  > {
+    let connection;
+    try {
+      connection = await dbPool.getConnection();
+
+      const [rows] = await connection.query(
+        `SELECT 
+          p.id AS productId,
+          p.name AS productName,
+          p.description AS productDescription,
+          SUM(od.quantity) AS totalQuantitySold,
+          SUM(od.quantity * od.unit_price) AS totalRevenue,
+          COUNT(DISTINCT od.order_id) AS orderCount
+         FROM order_details od
+         INNER JOIN products p ON od.product_id = p.id
+         INNER JOIN orders o ON od.order_id = o.id
+         WHERE o.status != 'CANCELLED'
+         GROUP BY p.id, p.name, p.description
+         ORDER BY totalQuantitySold DESC
+         LIMIT ?`,
+        [limit]
+      );
+
+      return rows as Array<{
+        productId: number;
+        productName: string;
+        productDescription: string;
+        totalQuantitySold: number;
+        totalRevenue: number;
+        orderCount: number;
+      }>;
+    } catch (error) {
+      throw new AppError(`Failed to get top products: ${error}`, 500);
+    } finally {
+      if (connection) connection.release();
+    }
+  }
+
+  async getTopUsers(limit: number = 5): Promise<
+    Array<{
+      userId: number;
+      userName: string;
+      userPhone: string;
+      userAddress: string;
+      totalSpent: number;
+      orderCount: number;
+      lastOrderDate: Date;
+    }>
+  > {
+    let connection;
+    try {
+      connection = await dbPool.getConnection();
+
+      const [rows] = await connection.query(
+        `SELECT 
+          u.id AS userId,
+          u.name AS userName,
+          u.phone AS userPhone,
+          u.address AS userAddress,
+          SUM(o.total_amount) AS totalSpent,
+          COUNT(o.id) AS orderCount,
+          MAX(o.date) AS lastOrderDate
+         FROM orders o
+         INNER JOIN users u ON o.user_id = u.id
+         WHERE o.status != 'CANCELLED'
+         GROUP BY u.id, u.name, u.phone, u.address
+         ORDER BY totalSpent DESC
+         LIMIT ?`,
+        [limit]
+      );
+
+      return rows as Array<{
+        userId: number;
+        userName: string;
+        userPhone: string;
+        userAddress: string;
+        totalSpent: number;
+        orderCount: number;
+        lastOrderDate: Date;
+      }>;
+    } catch (error) {
+      throw new AppError(`Failed to get top users: ${error}`, 500);
+    } finally {
+      if (connection) connection.release();
+    }
+  }
 }

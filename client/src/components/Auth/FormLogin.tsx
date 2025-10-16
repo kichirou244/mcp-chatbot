@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../../actions/auth.actions";
 import { useNotification } from "../../contexts/NotificationContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function FormLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
   const showNotification = useNotification();
+  const { login: authLogin } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,12 +17,17 @@ export default function FormLogin() {
       const formData = { username, password };
       const response = await login(formData);
 
-      if (response) {
+      if (response.ok) {
+        const token = response.data?.accessToken;
+        if (token) {
+          authLogin(token);
+        }
+
         showNotification("Đăng nhập thành công!", "success");
 
         setTimeout(() => {
           navigate("/", { replace: true });
-        }, 500);
+        }, 100);
       }
     } catch (error) {
       showNotification("Đăng nhập thất bại. Vui lòng thử lại.", "error");
@@ -71,7 +78,7 @@ export default function FormLogin() {
         <div>
           <button
             type="submit"
-            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-gradient-to-r from-blue-500 to-blue-700 text-white font-semibold text-base shadow-md hover:from-blue-600 hover:to-blue-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
           >
             Đăng nhập
           </button>

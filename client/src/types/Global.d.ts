@@ -4,3 +4,8 @@ export interface IToolResponse {
   data?: any;
   error?: string;
 }
+
+export interface IResponse<T> {
+  ok: boolean;
+  data: T;
+}

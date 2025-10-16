@@ -64,6 +64,41 @@ export async function chatWithMcpTools(
         });
         break;
 
+      case "search_outlets":
+        onProgress?.({ step: "executing", message: "Đang tìm kiếm..." });
+
+        const outletResult = await mcpClient.callTool("search_outlets", {
+          query: message,
+          conversationContext,
+        });
+
+        toolResult = JSON.parse((outletResult as any).content[0].text);
+        onProgress?.({
+          step: "tool_result",
+          message: `Tìm thấy ${toolResult.data?.length || 0} cửa hàng`,
+        });
+        break;
+
+      case "search_products_and_outlets":
+        onProgress?.({ step: "executing", message: "Đang tìm kiếm..." });
+
+        const productsOutletsResult = await mcpClient.callTool(
+          "search_products_and_outlets",
+          {
+            query: message,
+            conversationContext,
+          }
+        );
+
+        toolResult = JSON.parse((productsOutletsResult as any).content[0].text);
+        onProgress?.({
+          step: "tool_result",
+          message: `Tìm thấy ${toolResult.products?.length || 0} sản phẩm và ${
+            toolResult.outlets?.length || 0
+          } cửa hàng`,
+        });
+        break;
+
       case "create_order":
         onProgress?.({ step: "executing", message: "Đang xử lý đơn hàng..." });
 
@@ -157,6 +192,8 @@ function buildConversationContext(chatHistory: ChatMessage[]): string {
 
 function getToolName(tool: string): string {
   const names: Record<string, string> = {
+    search_outlets: "Tìm kiếm cửa hàng",
+    search_products_and_outlets: "Tìm kiếm sản phẩm và cửa hàng",
     search_products: "Tìm kiếm sản phẩm",
     create_order: "Tạo đơn hàng",
     analyze_intent: "Phân tích",

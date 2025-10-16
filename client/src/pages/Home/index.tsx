@@ -12,6 +12,7 @@ export default function HomePage() {
         <Header />
 
         <div className="pt-20">
+          <h1 className="text-3xl text-center">Danh sách sản phẩm</h1>
           <Products />
         </div>
 

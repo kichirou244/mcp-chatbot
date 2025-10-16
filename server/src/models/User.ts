@@ -12,6 +12,14 @@ export interface IUser {
   username: string;
 }
 
+export interface IUserResponse {
+  id: number;
+  username: string;
+  name: string;
+  phone: string;
+  address: string;
+}
+
 export interface IUserCreate {
   username: string;
   password: string;

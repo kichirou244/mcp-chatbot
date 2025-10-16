@@ -96,7 +96,7 @@ export class ProductService {
     try {
       connection = await dbPool.getConnection();
 
-      const { name, description, price, outletId } = product;
+      const { name, description, price, outletId, quantity } = product;
 
       const outlet = await outletServices.getOutletById(outletId);
 
@@ -105,8 +105,8 @@ export class ProductService {
       }
 
       const [result] = await connection.query(
-        "INSERT INTO products (name, description, price, outlet_id) VALUES (?, ?, ?, ?)",
-        [name, description, price, outletId]
+        "INSERT INTO products (name, description, price, outlet_id, quantity) VALUES (?, ?, ?, ?, ?)",
+        [name, description, price, outletId, quantity]
       );
 
       await connection.commit();
@@ -159,12 +159,13 @@ export class ProductService {
       };
 
       await connection.query(
-        "UPDATE products SET name = ?, description = ?, price = ?, outlet_id = ? WHERE id = ?",
+        "UPDATE products SET name = ?, description = ?, price = ?, outlet_id = ?, quantity = ? WHERE id = ?",
         [
           updatedProduct.name,
           updatedProduct.description,
           updatedProduct.price,
           updatedProduct.outletId,
+          updatedProduct.quantity,
           id,
         ]
       );

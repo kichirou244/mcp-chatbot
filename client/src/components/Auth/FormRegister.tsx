@@ -34,7 +34,7 @@ export default function FormRegister({
     try {
       const response = await register(formData);
 
-      if (response) {
+      if (response.ok) {
         showNotification("Đăng ký thành công!", "success");
 
         setForm({
@@ -44,7 +44,7 @@ export default function FormRegister({
           phone: "",
           address: "",
         });
-        
+
         setTimeout(() => {
           setIsLogin(true);
         }, 500);
@@ -189,7 +189,7 @@ export default function FormRegister({
         <div>
           <button
             type="submit"
-            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-gradient-to-r from-blue-500 to-blue-700 text-white font-semibold text-base shadow-md hover:from-blue-600 hover:to-blue-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
           >
             Đăng ký
           </button>

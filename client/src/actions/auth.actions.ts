@@ -25,7 +25,11 @@ export const login = async (formData: ILoginRequest) => {
       }
     }
 
-    return data;
+    return {
+      ok: response.ok,
+      status: response.status,
+      ...data,
+    };
   } catch (error) {
     console.error("Login error:", error);
   }
@@ -43,7 +47,11 @@ export const register = async (formData: IRegisterRequest) => {
 
     const data = await response.json();
 
-    return data as IAuthResponse;
+    return {
+      ok: response.ok,
+      status: response.status,
+      ...data,
+    };
   } catch (error) {
     console.error("Registration error:", error);
   }
@@ -64,7 +72,11 @@ export const getMe = async () => {
 
     const data = await response.json();
     if (response.ok) {
-      return data as IAuthResponse;
+      return {
+        ok: response.ok,
+        status: response.status,
+        ...data,
+      };
     }
   } catch (error) {
     console.error("Get me error:", error);

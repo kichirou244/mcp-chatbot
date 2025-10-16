@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { ChatMessage, ProgressEvent } from "../actions/aiAgent.actions";
+import type { ChatMessage, ProgressEvent } from "../actions/mcpTools.actions";
 import ReactMarkdown from "react-markdown";
 import { chatWithMcpTools } from "../actions/mcpTools.actions";
 

@@ -3,10 +3,11 @@ import express, { Request, Response } from "express";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import cors from "cors";
 
-import productRoutes from "./routes/productRoutes";
+import authRoutes from "./routes/authRoutes";
 import orderRoutes from "./routes/orderRoutes";
 import outletRoutes from "./routes/outletRoutes";
-import authRoutes from "./routes/authRoutes";
+import productRoutes from "./routes/productRoutes";
+import userRoutes from "./routes/userRoutes";
 
 import { createServices } from "./services/index.js";
 import { McpResourcesHandler } from "./services/McpResourcesHandler.js";
@@ -86,10 +87,11 @@ router.get("/connect", async (req: Request, res: Response) => {
 });
 
 app.use("/", router);
-app.use("/product", productRoutes);
+app.use("/auth", authRoutes);
 app.use("/order", orderRoutes);
 app.use("/outlet", outletRoutes);
-app.use("/auth", authRoutes);
+app.use("/product", productRoutes);
+app.use("/user", userRoutes);
 
 const PORT = 8080;
 app.listen(PORT, () => {
