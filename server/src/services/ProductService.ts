@@ -1,9 +1,11 @@
 import { dbPool } from "../config/database";
 import { IProduct, IProductWithOutlet } from "../models/Product";
 import { AppError } from "../utils/errors";
+import { EmbeddingService } from "./EmbeddingService";
 import { OutletService } from "./OutletService";
 
 const outletServices = new OutletService();
+const embeddingServices = new EmbeddingService();
 
 export class ProductService {
   async getProducts(): Promise<IProduct[]> {
@@ -112,6 +114,19 @@ export class ProductService {
       await connection.commit();
 
       const insertId = (result as any).insertId;
+
+      const data = {
+        id: insertId,
+        outletId: outletId,
+        name: name,
+        description: description,
+        price: price,
+        quantity: quantity,
+        outletName: outlet.name,
+        outletAddress: outlet.address,
+      };
+
+      await embeddingServices.indexProductWithOutletRows([data]);
 
       return {
         id: insertId,

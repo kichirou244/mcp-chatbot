@@ -22,4 +22,5 @@ export interface IOrderDetailResponse {
     quantity: number;
     unitPrice: number;
     subtotal: number;
+    outletId: number;
 }

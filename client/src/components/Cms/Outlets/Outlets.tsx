@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
-import { Table, Button, Space, message, Modal, Input } from "antd";
+import { useState } from "react";
+import { Table, Button, Space, Modal } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { IOutlet } from "../../../types/Outlet";
 import {
-  getOutlets,
   createOutlet,
   updateOutlet,
   deleteOutlet,
@@ -16,34 +15,23 @@ import {
   PlusOutlined,
 } from "@ant-design/icons";
 import OutletModal from "./OutletModal";
+import { useNotification } from "../../../contexts/NotificationContext";
 
-export default function Outlets() {
+interface OutletsProps {
+  outlets: IOutlet[];
+  loading: boolean;
+  onRefresh: () => void;
+}
+
+export default function Outlets({ outlets, loading, onRefresh }: OutletsProps) {
   const [modal, contextHolder] = Modal.useModal();
-  const [outlets, setOutlets] = useState<IOutlet[]>([]);
-  const [loading, setLoading] = useState(false);
+  const showNotification = useNotification();
   const [pageSize, setPageSize] = useState(10);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit" | "view">(
     "create"
   );
   const [selectedOutlet, setSelectedOutlet] = useState<IOutlet | null>(null);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const outletsRes = await getOutlets();
-      if (outletsRes.ok) setOutlets(outletsRes.data);
-    } catch (error) {
-      message.error("Lỗi khi tải dữ liệu!");
-      console.error("Error fetch data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleCreate = () => {
     setModalMode("create");
@@ -75,13 +63,13 @@ export default function Outlets() {
         try {
           const result = await deleteOutlet(outlet.id);
           if (result.ok) {
-            message.success("Xóa cửa hàng thành công!");
-            fetchData();
+            showNotification("Xóa cửa hàng thành công!", "success");
+            onRefresh();
           } else {
-            message.error("Xóa cửa hàng thất bại!");
+            showNotification("Xóa cửa hàng thất bại!", "error");
           }
         } catch (error) {
-          message.error("Lỗi khi xóa cửa hàng!");
+          showNotification("Lỗi khi xóa cửa hàng!", "error");
         }
       },
     });
@@ -92,21 +80,22 @@ export default function Outlets() {
       if (modalMode === "create") {
         const result = await createOutlet(values);
         if (result.ok) {
-          message.success("Tạo cửa hàng thành công!");
+          showNotification("Tạo cửa hàng thành công!", "success");
           setModalOpen(false);
-          fetchData();
+          onRefresh();
         }
       } else if (modalMode === "edit" && selectedOutlet) {
         const result = await updateOutlet(selectedOutlet.id, values);
         if (result.ok) {
-          message.success("Cập nhật cửa hàng thành công!");
+          showNotification("Cập nhật cửa hàng thành công!", "success");
           setModalOpen(false);
-          fetchData();
+          onRefresh();
         }
       }
     } catch (error) {
-      message.error(
-        `Lỗi khi ${modalMode === "create" ? "tạo" : "cập nhật"} cửa hàng!`
+      showNotification(
+        `Lỗi khi ${modalMode === "create" ? "tạo" : "cập nhật"} cửa hàng!`,
+        "error"
       );
     }
   };
@@ -118,7 +107,7 @@ export default function Outlets() {
       key: "name",
       sorter: (a, b) => a.name.localeCompare(b.name),
       filterSearch: true,
-      width: 200,
+      width: 300,
       ellipsis: true,
       render: (text: string) => <span className="truncate">{text}</span>,
     },
@@ -127,6 +116,7 @@ export default function Outlets() {
       dataIndex: "address",
       key: "address",
       ellipsis: true,
+      width: 300,
       render: (text: string) => <span className="truncate">{text}</span>,
     },
     {
@@ -163,40 +153,10 @@ export default function Outlets() {
   ];
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow h-full flex flex-col">
+    <div className="bg-white p-6 shadow h-full flex flex-col">
       <div className="mb-4 flex items-center justify-between flex-shrink-0">
         <h2 className="text-2xl font-bold">Quản lý cửa hàng</h2>
         <div className="flex items-center gap-2">
-          <Input
-            placeholder="Tìm kiếm cửa hàng..."
-            allowClear
-            className="w-64"
-            onChange={(e) => {
-              const value = e.target.value
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "");
-              if (!value) {
-                fetchData();
-              } else {
-                setOutlets((prev) =>
-                  prev.filter(
-                    (outlet) =>
-                      outlet.name
-                        .toLowerCase()
-                        .normalize("NFD")
-                        .replace(/[\u0300-\u036f]/g, "")
-                        .includes(value) ||
-                      outlet.address
-                        .toLowerCase()
-                        .normalize("NFD")
-                        .replace(/[\u0300-\u036f]/g, "")
-                        .includes(value)
-                  )
-                );
-              }
-            }}
-          />
           <Button
             type="primary"
             size="large"

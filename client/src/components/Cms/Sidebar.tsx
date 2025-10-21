@@ -11,11 +11,11 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="fixed left-0 w-64 bg-white text-gray-900 flex flex-col border-r border-gray-200 z-30">
+    <div className="fixed left-0 top-0 h-screen w-64 bg-white text-gray-900 flex flex-col border-r border-gray-200 z-30">
       <div className="p-3 border-b border-gray-200">
-        <h2 className="text-xl font-bold">CMS</h2>
+        <h2 className="text-xl mt-3 font-bold">CMS</h2>
       </div>
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 p-4 overflow-y-auto">
         <ul className="space-y-2">
           {menuItems.map((item) => (
             <li key={item.path}>

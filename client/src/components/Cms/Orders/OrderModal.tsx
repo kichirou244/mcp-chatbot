@@ -13,6 +13,7 @@ import type { IOrder, IOrderDetail } from "../../../types/Order";
 import type { IProduct } from "../../../types/Product";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import type { IUserResponse } from "../../../types/User";
+import type { IOutlet } from "../../../types/Outlet";
 
 interface OrderModalProps {
   open: boolean;
@@ -20,6 +21,7 @@ interface OrderModalProps {
   order: IOrder | null;
   users: IUserResponse[];
   products: IProduct[];
+  outlets: IOutlet[];
   onCancel: () => void;
   onSubmit: (values: any) => Promise<void>;
 }
@@ -29,6 +31,7 @@ const OrderModal = ({
   mode,
   order,
   users,
+  outlets,
   products,
   onCancel,
   onSubmit,
@@ -82,6 +85,7 @@ const OrderModal = ({
         productName: product.name,
         productDescription: product.description,
         unitPrice: product.price,
+        outletId: product.outletId,
       };
       setOrderDetails(newDetails);
     }
@@ -235,6 +239,18 @@ const OrderModal = ({
         ),
     },
     {
+      title: "Cửa hàng",
+      key: "outletId",
+      width: 150,
+      render: (_: any, record: IOrderDetail) => {
+        console.log(record.outletId)
+        const outlet = outlets.find((o) => o.id === record.outletId);
+        if (outlet) {
+          return <span>{outlet.name}</span>;
+        }
+      },
+    },
+    {
       title: "Thành tiền",
       key: "subtotal",
       width: 130,
@@ -313,6 +329,7 @@ const OrderModal = ({
           >
             <Select
               placeholder="Chọn trạng thái"
+              disabled={mode === "view" || mode === "create"}
               options={[
                 { value: "PENDING", label: "Chờ xử lý" },
                 { value: "CONFIRMED", label: "Đã xác nhận" },

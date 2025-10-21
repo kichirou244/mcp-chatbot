@@ -171,4 +171,42 @@ export class OrderController {
       });
     }
   };
+
+  getOrdersByProduct = async (req: Request, res: Response): Promise<void> => {
+    const productId = parseInt(req.params.productId, 10);
+    if (isNaN(productId)) {
+      res.status(400).json({ error: "Invalid product ID" });
+      return;
+    }
+
+    try {
+      const orders = await this.services.orderService.getOrdersByProduct(
+        productId
+      );
+      res.status(200).json(orders);
+    } catch (error: any) {
+      console.error(`Error fetching orders for product ${productId}:`, error);
+      res.status(error.statusCode || 500).json({
+        error: error.message || "Internal server error",
+      });
+    }
+  };
+
+  getOrdersByUser = async (req: Request, res: Response): Promise<void> => {
+    const userId = parseInt(req.params.userId, 10);
+    if (isNaN(userId)) {
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
+    }
+
+    try {
+      const orders = await this.services.orderService.getOrdersByUser(userId);
+      res.status(200).json(orders);
+    } catch (error: any) {
+      console.error(`Error fetching orders for user ${userId}:`, error);
+      res.status(error.statusCode || 500).json({
+        error: error.message || "Internal server error",
+      });
+    }
+  };
 }

@@ -164,3 +164,52 @@ export async function getTopUsers(
     return { ok: false, data: [] };
   }
 }
+
+export async function getOrdersByProduct(
+  productId: number
+): Promise<IResponse<IOrder[]>> {
+  try {
+    const response = await fetch(
+      `${BASE_URL}/order/by-product/${productId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return { ok: true, data };
+  } catch (error) {
+    console.error("Error fetching orders by product:", error);
+    return { ok: false, data: [] };
+  }
+}
+
+export async function getOrdersByUser(
+  userId: number
+): Promise<IResponse<IOrder[]>> {
+  try {
+    const response = await fetch(`${BASE_URL}/order/by-user/${userId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return { ok: true, data };
+  } catch (error) {
+    console.error("Error fetching orders by user:", error);
+    return { ok: false, data: [] };
+  }
+}

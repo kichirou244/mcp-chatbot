@@ -15,6 +15,7 @@ export interface IOrderDetail {
   quantity: number;
   unitPrice: number;
   subtotal?: number;
+  outletId?: number;
 }
 
 export interface IOrder {

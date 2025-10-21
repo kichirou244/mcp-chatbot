@@ -1,15 +1,13 @@
-import { useEffect, useState } from "react";
-import { Table, Button, Space, message, Modal } from "antd";
+import { useState } from "react";
+import { Table, Button, Space, Modal } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { IProduct, IProductCreate } from "../../../types/Product";
 import {
-  getProducts,
   createProduct,
   updateProduct,
   deleteProduct,
 } from "../../../actions/product.actions";
 import type { IOutlet } from "../../../types/Outlet";
-import { getOutlets } from "../../../actions/outlet.actions";
 import {
   DeleteOutlined,
   EditOutlined,
@@ -17,40 +15,29 @@ import {
   PlusOutlined,
 } from "@ant-design/icons";
 import ProductModal from "./ProductModal";
+import { useNotification } from "../../../contexts/NotificationContext";
 
-export default function Products() {
+interface ProductsProps {
+  products: IProduct[];
+  outlets: IOutlet[];
+  loading: boolean;
+  onRefresh: () => void;
+}
+
+export default function Products({ 
+  products, 
+  outlets, 
+  loading,
+  onRefresh 
+}: ProductsProps) {
   const [modal, contextHolder] = Modal.useModal();
-  const [products, setProducts] = useState<IProduct[]>([]);
-  const [outlets, setOutlets] = useState<IOutlet[]>([]);
+  const showNotification = useNotification();
   const [pageSize, setPageSize] = useState(10);
-  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit" | "view">(
     "create"
   );
   const [selectedProduct, setSelectedProduct] = useState<IProduct | null>(null);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [productsRes, outletsRes] = await Promise.all([
-        getProducts(),
-        getOutlets(),
-      ]);
-
-      if (productsRes.ok) setProducts(productsRes.data);
-      if (outletsRes.ok) setOutlets(outletsRes.data);
-    } catch (error) {
-      message.error("Lỗi khi tải dữ liệu!");
-      console.error("Error fetch data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleCreate = () => {
     setModalMode("create");
@@ -81,11 +68,11 @@ export default function Products() {
         try {
           const result = await deleteProduct(product.id);
           if (result.ok) {
-            message.success("Xóa sản phẩm thành công!");
-            fetchData();
+            showNotification("Xóa sản phẩm thành công!", "success");
+            onRefresh();
           }
         } catch (error) {
-          message.error("Lỗi khi xóa sản phẩm!");
+          showNotification("Lỗi khi xóa sản phẩm!", "error");
         }
       },
     });
@@ -96,21 +83,22 @@ export default function Products() {
       if (modalMode === "create") {
         const result = await createProduct(values);
         if (result.ok) {
-          message.success("Tạo sản phẩm thành công!");
+          showNotification("Tạo sản phẩm thành công!", "success");
           setModalOpen(false);
-          fetchData();
+          onRefresh();
         }
       } else if (modalMode === "edit" && selectedProduct) {
         const result = await updateProduct(selectedProduct.id, values);
         if (result.ok) {
-          message.success("Cập nhật sản phẩm thành công!");
+          showNotification("Cập nhật sản phẩm thành công!", "success");
           setModalOpen(false);
-          fetchData();
+          onRefresh();
         }
       }
     } catch (error) {
-      message.error(
-        `Lỗi khi ${modalMode === "create" ? "tạo" : "cập nhật"} sản phẩm!`
+      showNotification(
+        `Lỗi khi ${modalMode === "create" ? "tạo" : "cập nhật"} sản phẩm!`,
+        "error"
       );
     }
   };
@@ -217,14 +205,16 @@ export default function Products() {
     <div className="bg-white p-6 rounded-lg shadow h-full flex flex-col min-h-[600px]">
       <div className="mb-4 flex justify-between items-center flex-shrink-0">
         <h2 className="text-2xl font-bold">Quản lý sản phẩm</h2>
-        <Button
-          type="primary"
-          size="large"
-          icon={<PlusOutlined />}
-          onClick={handleCreate}
-        >
-          Thêm sản phẩm
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlusOutlined />}
+            onClick={handleCreate}
+          >
+            Thêm sản phẩm
+          </Button>
+        </div>
       </div>
       <Table
         columns={columns}

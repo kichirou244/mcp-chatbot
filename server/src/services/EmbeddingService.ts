@@ -17,17 +17,13 @@ export interface ProductOutletMetadata {
 export class EmbeddingService {
   private pinecone: Pinecone;
   private indexName: string;
-  private namespace: string =
-    process.env.PINECONE_NAMESPACE || "products-outlets";
+  private namespace: string = process.env.PINECONE_NAMESPACE || "";
   private genAi: GoogleGenAI;
 
   constructor() {
-    const apiKey = process.env.PINECONE_API_KEY;
-    if (!apiKey) {
-      throw new AppError("PINECONE_API_KEY not found in environment", 500);
-    }
+    const apiKey = process.env.PINECONE_API_KEY || "";
 
-    this.indexName = process.env.PINECONE_INDEX_NAME || "mcp-chatbot";
+    this.indexName = process.env.PINECONE_INDEX_NAME || "";
 
     this.pinecone = new Pinecone({
       apiKey: apiKey,
@@ -43,8 +39,10 @@ export class EmbeddingService {
       typeof meta.price === "number"
         ? meta.price.toFixed(2)
         : String(meta.price ?? "");
+        
     const desc = meta.description ? ` Description: ${meta.description}.` : "";
     const outletAddr = meta.outletAddress ? `, ${meta.outletAddress}` : "";
+
     return `Product: ${meta.productName}.${desc} Price: ${price}. Quantity: ${meta.quantity}. Outlet: ${meta.outletName}${outletAddr}.`;
   }
 

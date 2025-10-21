@@ -147,35 +147,38 @@ export class OrderService {
       const orders = orderRows as IOrder[];
 
       const [detailRows] = await connection.query(
-        `SELECT od.id, od.order_id AS orderId, od.product_id AS productId, od.quantity, od.unit_price AS unitPrice, p.name AS productName, p.description AS productDescription
+        `SELECT od.id, od.order_id AS orderId, od.product_id AS productId, od.quantity, od.unit_price AS unitPrice, p.name AS productName, p.description AS productDescription, p.outlet_id AS outletId
          FROM order_details od
          LEFT JOIN products p ON od.product_id = p.id`
       );
 
       const orderDetails = detailRows as Array<IOrderDetailResponse>;
 
-      const ordersWithDetails: IOrderResponse[] = orders.map((o) => {
-        const detailsForOrder = orderDetails
-          .filter((d) => d.orderId === o.id)
-          .map((d) => ({
-            id: d.id,
-            productId: d.productId,
-            productName: d.productName,
-            productDescription: d.productDescription,
-            quantity: d.quantity,
-            unitPrice: d.unitPrice,
-            subtotal: d.unitPrice * d.quantity,
-          }));
+      const ordersWithDetails: IOrderResponse[] = orders
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .map((o) => {
+          const detailsForOrder = orderDetails
+            .filter((d) => d.orderId === o.id)
+            .map((d) => ({
+              id: d.id,
+              productId: d.productId,
+              productName: d.productName,
+              productDescription: d.productDescription,
+              quantity: d.quantity,
+              unitPrice: d.unitPrice,
+              subtotal: d.unitPrice * d.quantity,
+              outletId: d.outletId,
+            }));
 
-        return {
-          orderId: o.id,
-          userId: o.userId,
-          totalAmount: o.totalAmount,
-          date: o.date,
-          status: o.status,
-          orderDetails: detailsForOrder,
-        } as IOrderResponse;
-      });
+          return {
+            orderId: o.id,
+            userId: o.userId,
+            totalAmount: o.totalAmount,
+            date: o.date,
+            status: o.status,
+            orderDetails: detailsForOrder,
+          } as IOrderResponse;
+        });
 
       return ordersWithDetails;
     } catch (error) {
@@ -504,6 +507,129 @@ export class OrderService {
       }>;
     } catch (error) {
       throw new AppError(`Failed to get top users: ${error}`, 500);
+    } finally {
+      if (connection) connection.release();
+    }
+  }
+
+  async getOrdersByProduct(productId: number): Promise<IOrderResponse[]> {
+    let connection;
+    try {
+      connection = await dbPool.getConnection();
+
+      const [orderRows] = await connection.query(
+        `SELECT DISTINCT o.id, o.user_id AS userId, o.date, o.total_amount AS totalAmount, o.status
+         FROM orders o
+         INNER JOIN order_details od ON o.id = od.order_id
+         WHERE od.product_id = ? AND o.status != 'CANCELLED'
+         ORDER BY o.date DESC`,
+        [productId]
+      );
+      const orders = orderRows as IOrder[];
+
+      const orderIds = orders.map((o) => o.id);
+
+      if (orderIds.length === 0) {
+        return [];
+      }
+
+      const [detailRows] = await connection.query(
+        `SELECT od.id, od.order_id AS orderId, od.product_id AS productId, od.quantity, od.unit_price AS unitPrice, p.name AS productName, p.description AS productDescription
+         FROM order_details od
+         LEFT JOIN products p ON od.product_id = p.id
+         WHERE od.order_id IN (?)`,
+        [orderIds]
+      );
+
+      const orderDetails = detailRows as Array<IOrderDetailResponse>;
+
+      const ordersWithDetails: IOrderResponse[] = orders.map((o) => {
+        const detailsForOrder = orderDetails
+          .filter((d) => d.orderId === o.id)
+          .map((d) => ({
+            id: d.id,
+            productId: d.productId,
+            productName: d.productName,
+            productDescription: d.productDescription,
+            quantity: d.quantity,
+            unitPrice: d.unitPrice,
+            subtotal: d.unitPrice * d.quantity,
+          }));
+
+        return {
+          orderId: o.id,
+          userId: o.userId,
+          totalAmount: o.totalAmount,
+          date: o.date,
+          status: o.status,
+          orderDetails: detailsForOrder,
+        } as IOrderResponse;
+      });
+
+      return ordersWithDetails;
+    } catch (error) {
+      throw new AppError(`Failed to get orders for product: ${error}`, 500);
+    } finally {
+      if (connection) connection.release();
+    }
+  }
+
+  async getOrdersByUser(userId: number): Promise<IOrderResponse[]> {
+    let connection;
+    try {
+      connection = await dbPool.getConnection();
+
+      const [orderRows] = await connection.query(
+        `SELECT id, user_id AS userId, date, total_amount AS totalAmount, status
+         FROM orders
+         WHERE user_id = ? AND status != 'CANCELLED'
+         ORDER BY date DESC`,
+        [userId]
+      );
+      const orders = orderRows as IOrder[];
+
+      if (orders.length === 0) {
+        return [];
+      }
+
+      const orderIds = orders.map((o) => o.id);
+
+      const [detailRows] = await connection.query(
+        `SELECT od.id, od.order_id AS orderId, od.product_id AS productId, od.quantity, od.unit_price AS unitPrice, p.name AS productName, p.description AS productDescription
+         FROM order_details od
+         LEFT JOIN products p ON od.product_id = p.id
+         WHERE od.order_id IN (?)`,
+        [orderIds]
+      );
+
+      const orderDetails = detailRows as Array<IOrderDetailResponse>;
+
+      const ordersWithDetails: IOrderResponse[] = orders.map((o) => {
+        const detailsForOrder = orderDetails
+          .filter((d) => d.orderId === o.id)
+          .map((d) => ({
+            id: d.id,
+            productId: d.productId,
+            productName: d.productName,
+            productDescription: d.productDescription,
+            quantity: d.quantity,
+            unitPrice: d.unitPrice,
+            subtotal: d.unitPrice * d.quantity,
+          }));
+
+        return {
+          orderId: o.id,
+          userId: o.userId,
+          totalAmount: o.totalAmount,
+          date: o.date,
+          status: o.status,
+          orderDetails: detailsForOrder,
+        } as IOrderResponse;
+      });
+
+      return ordersWithDetails;
+    } catch (error) {
+      throw new AppError(`Failed to get orders for user: ${error}`, 500);
     } finally {
       if (connection) connection.release();
     }

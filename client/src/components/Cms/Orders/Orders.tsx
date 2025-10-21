@@ -1,15 +1,13 @@
-import { useEffect, useState } from "react";
-import { Table, Button, Space, message, Modal, Tag, Input } from "antd";
+import { useState } from "react";
+import { Table, Button, Space, Modal, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { IOrder } from "../../../types/Order";
 import type { IProduct } from "../../../types/Product";
 import {
-  getOrders,
   createOrder,
   updateOrder,
   deleteOrder,
 } from "../../../actions/order.actions";
-import { getProducts } from "../../../actions/product.actions";
 import {
   DeleteOutlined,
   EditOutlined,
@@ -18,44 +16,34 @@ import {
 } from "@ant-design/icons";
 import OrderModal from "./OrderModal";
 import type { IUserResponse } from "../../../types/User";
-import { getUsers } from "../../../actions/user.actions";
+import { useNotification } from "../../../contexts/NotificationContext";
+import type { IOutlet } from "../../../types/Outlet";
 
-export default function Orders() {
+interface OrdersProps {
+  orders: IOrder[];
+  products: IProduct[];
+  users: IUserResponse[];
+  outlets: IOutlet[];
+  loading: boolean;
+  onRefresh: () => void;
+}
+
+export default function Orders({
+  orders,
+  products,
+  users,
+  outlets,
+  loading,
+  onRefresh,
+}: OrdersProps) {
   const [modal, contextHolder] = Modal.useModal();
-  const [orders, setOrders] = useState<IOrder[]>([]);
-  const [products, setProducts] = useState<IProduct[]>([]);
-  const [users, setUsers] = useState<IUserResponse[]>([]);
+  const showNotification = useNotification();
   const [pageSize, setPageSize] = useState(10);
-  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit" | "view">(
     "create"
   );
   const [selectedOrder, setSelectedOrder] = useState<IOrder | null>(null);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [ordersRes, productsRes, usersRes] = await Promise.all([
-        getOrders(),
-        getProducts(),
-        getUsers(),
-      ]);
-
-      if (ordersRes.ok) setOrders(ordersRes.data);
-      if (productsRes.ok) setProducts(productsRes.data);
-      if (usersRes.ok) setUsers(usersRes.data);
-    } catch (error) {
-      message.error("Lỗi khi tải dữ liệu!");
-      console.error("Error fetch data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleCreate = () => {
     setModalMode("create");
@@ -86,11 +74,11 @@ export default function Orders() {
         try {
           const result = await deleteOrder(order.orderId);
           if (result.ok) {
-            message.success("Xóa đơn hàng thành công!");
-            fetchData();
+            showNotification("Xóa đơn hàng thành công!", "success");
+            onRefresh();
           }
         } catch (error) {
-          message.error("Lỗi khi xóa đơn hàng!");
+          showNotification("Lỗi khi xóa đơn hàng!", "error");
         }
       },
     });
@@ -101,21 +89,22 @@ export default function Orders() {
       if (modalMode === "create") {
         const result = await createOrder(values);
         if (result.ok) {
-          message.success("Tạo đơn hàng thành công!");
+          showNotification("Tạo đơn hàng thành công!", "success");
           setModalOpen(false);
-          fetchData();
+          onRefresh();
         }
       } else if (modalMode === "edit" && selectedOrder) {
         const result = await updateOrder(selectedOrder.orderId, values);
         if (result.ok) {
-          message.success("Cập nhật đơn hàng thành công!");
+          showNotification("Cập nhật đơn hàng thành công!", "success");
           setModalOpen(false);
-          fetchData();
+          onRefresh();
         }
       }
     } catch (error) {
-      message.error(
-        `Lỗi khi ${modalMode === "create" ? "tạo" : "cập nhật"} đơn hàng!`
+      showNotification(
+        `Lỗi khi ${modalMode === "create" ? "tạo" : "cập nhật"} đơn hàng!`,
+        "error"
       );
     }
   };
@@ -257,30 +246,6 @@ export default function Orders() {
       <div className="mb-4 flex justify-between items-center flex-shrink-0">
         <h2 className="text-2xl font-bold">Quản lý đơn hàng</h2>
         <div className="flex items-center gap-2">
-          <Input
-            placeholder="Tìm kiếm cửa hàng..."
-            allowClear
-            className="w-64"
-            onChange={(e) => {
-              const value = e.target.value
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "");
-              if (!value) {
-                fetchData();
-              } else {
-                setOrders((prev) =>
-                  prev.filter((order) =>
-                    order.date
-                      .toLowerCase()
-                      .normalize("NFD")
-                      .replace(/[\u0300-\u036f]/g, "")
-                      .includes(value)
-                  )
-                );
-              }
-            }}
-          />
           <Button
             type="primary"
             size="large"
@@ -314,6 +279,7 @@ export default function Orders() {
         order={selectedOrder}
         users={users}
         products={products}
+        outlets={outlets}
         onCancel={() => setModalOpen(false)}
         onSubmit={handleModalSubmit}
       />

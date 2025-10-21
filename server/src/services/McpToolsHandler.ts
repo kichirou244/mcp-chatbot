@@ -350,18 +350,18 @@ Chỉ trả về câu truy vấn, không giải thích.`;
       if (resultData.length > 10) {
         const rankingPrompt = `Từ danh sách sản phẩm tìm được, chọn tối đa 10 sản phẩm phù hợp nhất với câu hỏi.
 
-Câu hỏi: "${query}"
-Ngữ cảnh: ${conversationContext}
+      Câu hỏi: "${query}"
+      Ngữ cảnh: ${conversationContext}
 
-Danh sách sản phẩm:
-${JSON.stringify(resultData.slice(0, 30))}
+      Danh sách sản phẩm:
+      ${JSON.stringify(resultData.slice(0, 30))}
 
-Trả về JSON:
-{
-  "selectedProducts": [id1, id2, ...],
-  "keywords": ["từ khóa"],
-  "reason": "lý do chọn"
-}`;
+      Trả về JSON:
+      {
+        "selectedProducts": [{"productId": id, "outletId": id}, ...],
+        "keywords": ["từ khóa"],
+        "reason": "lý do chọn"
+      }`;
 
         const rankingResponse = await agent.ask(
           "gemini-2.5-flash",
@@ -370,7 +370,9 @@ Trả về JSON:
         const ranking = this.parseAIResponse(rankingResponse);
 
         finalResults = resultData.filter((p) =>
-          ranking.selectedProducts.includes(p.id)
+          ranking.selectedProducts.some(
+            (s: any) => s.productId === p.id && s.outletId === p.outletId
+          )
         );
       }
 
@@ -702,7 +704,8 @@ Trả về JSON:
     const agent = AiAgentFactory.create("gemini");
 
     try {
-      const allProducts = await this.services.productService.getProducts();
+      const allProducts =
+        await this.services.productService.getProductsOutlets();
 
       if (allProducts.length === 0) {
         return {
@@ -726,11 +729,13 @@ YÊU CẦU HIỆN TẠI: "${message}"
 
 Sản phẩm có sẵn:
 ${JSON.stringify(
-  allProducts.map((p: IProduct) => ({
+  allProducts.map((p: IProductWithOutlet) => ({
     id: p.id,
     name: p.name,
     price: p.price,
     quantity: p.quantity,
+    outletName: p.outletName,
+    outletAddress: p.outletAddress,
   }))
 )}
 
@@ -830,6 +835,10 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
           };
         }
 
+        const outlet = await this.services.outletService.getOutletById(
+          product.outletId
+        );
+
         if (product.quantity < item.quantity) {
           return {
             content: [
@@ -851,6 +860,8 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
           productName: product.name,
           quantity: item.quantity,
           price: product.price,
+          outletName: outlet && outlet.name,
+          outletAddress: outlet && outlet.address,
         });
       }
 
@@ -890,7 +901,9 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
                     validatedItems
                       .map(
                         (item, idx) =>
-                          `${idx + 1}. ${item.productName} x${
+                          `${idx + 1}. ${item.productName} - ${
+                            item.outletName
+                          } - ${item.outletAddress} x${
                             item.quantity
                           } - ${item.price.toLocaleString()}đ`
                       )
@@ -1089,7 +1102,9 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
         toolResult.items
           .map(
             (item: any, idx: number) =>
-              `${idx + 1}. ${item.productName} - số lượng: ${item.quantity}`
+              `${idx + 1}. ${item.productName} - Cửa hàng: ${
+                item.outletName
+              } - ${item.outletAddress} - số lượng: ${item.quantity}`
           )
           .join("\n") +
         (toolResult.totalAmount
@@ -1110,7 +1125,7 @@ Danh sách sản phẩm đơn hàng:${orderSummary}
 HƯỚNG DẪN:
 - Nếu user dùng đại từ ("cái này", "nó", "cái đó"), hãy nhắc lại tên sản phẩm cụ thể
 - Trả lời ngắn gọn, súc tích nhưng đầy đủ thông tin
-- Nếu có danh sách sản phẩm, liệt kê rõ ràng với giá (tối đa 5 sản phẩm)
+- Nếu có danh sách sản phẩm, liệt kê rõ ràng với giá (tối đa 5 sản phẩm) kèm với tên cửa hàng bán và địa chỉ của cửa hàng đó
 - Nếu user hỏi tiếp về sản phẩm đã nói trước đó, hãy tiếp tục ngữ cảnh đó
 - Luôn thân thiện và hữu ích
 - Nếu có lỗi, giải thích rõ ràng và gợi ý hướng giải quyết
