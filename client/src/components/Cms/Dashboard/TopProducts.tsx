@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { Card, Table, Tag, message, Spin, Modal, Descriptions } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import {
-  getOrdersByProduct,
-} from "../../../actions/order.actions";
-import type { ITopProduct } from "../../../types/Order";
-import type { IOrder } from "../../../types/Order";
+import { getOrdersByProduct } from "@/actions/order.actions";
+import type { ITopProduct } from "@/types/Order";
+import type { IOrder } from "@/types/Order";
 import { EyeOutlined } from "@ant-design/icons";
 
 interface TopProductsProps {
@@ -13,7 +11,10 @@ interface TopProductsProps {
   loading: boolean;
 }
 
-export default function TopProducts({ topProducts, loading }: TopProductsProps) {
+export default function TopProducts({
+  topProducts,
+  loading,
+}: TopProductsProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ITopProduct | null>(
     null
@@ -84,7 +85,8 @@ export default function TopProducts({ topProducts, loading }: TopProductsProps) 
       render: (status: string) => {
         const statusColors: Record<string, string> = {
           PENDING: "orange",
-          COMPLETED: "green",
+          CONFIRMED: "blue",
+          DELIVERED: "green",
           CANCELLED: "red",
         };
         return <Tag color={statusColors[status] || "default"}>{status}</Tag>;

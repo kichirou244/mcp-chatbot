@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Table, Button, Space, Modal } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { IOutlet } from "../../../types/Outlet";
+import type { IOutlet } from "@/types/Outlet";
 import {
   createOutlet,
   updateOutlet,
   deleteOutlet,
-} from "../../../actions/outlet.actions";
+} from "@/actions/outlet.actions";
 import {
   DeleteOutlined,
   EditOutlined,
@@ -15,7 +15,7 @@ import {
   PlusOutlined,
 } from "@ant-design/icons";
 import OutletModal from "./OutletModal";
-import { useNotification } from "../../../contexts/NotificationContext";
+import { useNotification } from "@/contexts/NotificationContext";
 
 interface OutletsProps {
   outlets: IOutlet[];

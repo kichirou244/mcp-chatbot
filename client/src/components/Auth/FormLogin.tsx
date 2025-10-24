@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "../../actions/auth.actions";
-import { useNotification } from "../../contexts/NotificationContext";
-import { useAuth } from "../../contexts/AuthContext";
+import { login } from "@/actions/auth.actions";
+import { useNotification } from "@/contexts/NotificationContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function FormLogin() {
   const [username, setUsername] = useState("");

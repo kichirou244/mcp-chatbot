@@ -1,27 +1,17 @@
 import { useState } from "react";
-import { Table, Button, Space, Modal, Tag } from "antd";
+import { Table, Button, Space, Modal, Select } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { IOrder } from "../../../types/Order";
-import type { IProduct } from "../../../types/Product";
-import {
-  createOrder,
-  updateOrder,
-  deleteOrder,
-} from "../../../actions/order.actions";
-import {
-  DeleteOutlined,
-  EditOutlined,
-  EyeOutlined,
-  PlusOutlined,
-} from "@ant-design/icons";
+import type { IOrder } from "@/types/Order";
+
+import { EyeOutlined } from "@ant-design/icons";
 import OrderModal from "./OrderModal";
-import type { IUserResponse } from "../../../types/User";
-import { useNotification } from "../../../contexts/NotificationContext";
-import type { IOutlet } from "../../../types/Outlet";
+import type { IUserResponse } from "@/types/User";
+import { useNotification } from "@/contexts/NotificationContext";
+import type { IOutlet } from "@/types/Outlet";
+import { updateOrder } from "@/actions/order.actions";
 
 interface OrdersProps {
   orders: IOrder[];
-  products: IProduct[];
   users: IUserResponse[];
   outlets: IOutlet[];
   loading: boolean;
@@ -30,7 +20,6 @@ interface OrdersProps {
 
 export default function Orders({
   orders,
-  products,
   users,
   outlets,
   loading,
@@ -40,102 +29,25 @@ export default function Orders({
   const showNotification = useNotification();
   const [pageSize, setPageSize] = useState(10);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"create" | "edit" | "view">(
-    "create"
-  );
   const [selectedOrder, setSelectedOrder] = useState<IOrder | null>(null);
 
-  const handleCreate = () => {
-    setModalMode("create");
-    setSelectedOrder(null);
-    setModalOpen(true);
-  };
-
-  const handleEdit = (order: IOrder) => {
-    setModalMode("edit");
-    setSelectedOrder(order);
-    setModalOpen(true);
-  };
-
   const handleView = (order: IOrder) => {
-    setModalMode("view");
     setSelectedOrder(order);
     setModalOpen(true);
   };
 
-  const handleDelete = (order: IOrder) => {
-    modal.confirm({
-      title: "Xác nhận xóa",
-      content: `Bạn có chắc chắn muốn xóa đơn hàng #${order.orderId}?`,
-      okText: "Xóa",
-      okType: "danger",
-      cancelText: "Hủy",
-      onOk: async () => {
-        try {
-          const result = await deleteOrder(order.orderId);
-          if (result.ok) {
-            showNotification("Xóa đơn hàng thành công!", "success");
-            onRefresh();
-          }
-        } catch (error) {
-          showNotification("Lỗi khi xóa đơn hàng!", "error");
-        }
-      },
-    });
-  };
-
-  const handleModalSubmit = async (values: any) => {
+  const handleStatusChange = async (orderId: number, newStatus: string) => {
     try {
-      if (modalMode === "create") {
-        const result = await createOrder(values);
-        if (result.ok) {
-          showNotification("Tạo đơn hàng thành công!", "success");
-          setModalOpen(false);
-          onRefresh();
-        }
-      } else if (modalMode === "edit" && selectedOrder) {
-        const result = await updateOrder(selectedOrder.orderId, values);
-        if (result.ok) {
-          showNotification("Cập nhật đơn hàng thành công!", "success");
-          setModalOpen(false);
-          onRefresh();
-        }
+      const response = await updateOrder(orderId, { status: newStatus });
+      if (response.ok) {
+        showNotification("Cập nhật trạng thái đơn hàng thành công", "success");
+        onRefresh();
+      } else {
+        showNotification("Không thể cập nhật trạng thái đơn hàng", "error");
       }
     } catch (error) {
-      showNotification(
-        `Lỗi khi ${modalMode === "create" ? "tạo" : "cập nhật"} đơn hàng!`,
-        "error"
-      );
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "PENDING":
-        return "orange";
-      case "CONFIRMED":
-        return "blue";
-      case "DELIVERED":
-        return "green";
-      case "CANCELLED":
-        return "red";
-      default:
-        return "default";
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "PENDING":
-        return "Chờ xử lý";
-      case "CONFIRMED":
-        return "Đã xác nhận";
-      case "DELIVERED":
-        return "Đã giao";
-      case "CANCELLED":
-        return "Đã hủy";
-      default:
-        return status;
+      console.error("Error updating order status:", error);
+      showNotification("Đã xảy ra lỗi khi cập nhật trạng thái", "error");
     }
   };
 
@@ -188,7 +100,7 @@ export default function Orders({
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 70,
+      width: 90,
       filters: [
         { text: "Chờ xử lý", value: "PENDING" },
         { text: "Đã xác nhận", value: "CONFIRMED" },
@@ -196,9 +108,25 @@ export default function Orders({
         { text: "Đã hủy", value: "CANCELLED" },
       ],
       onFilter: (value, record) => record.status === value,
-      render: (status: string) => (
-        <Tag color={getStatusColor(status)}>{getStatusText(status)}</Tag>
-      ),
+      render: (status: string, record: IOrder) => {
+        return (
+          <Select
+            value={status}
+            onChange={(newStatus) =>
+              handleStatusChange(record.orderId, newStatus)
+            }
+            style={{
+              width: 140,
+            }}
+            options={[
+              { label: "Chờ xử lý", value: "PENDING" },
+              { label: "Đã xác nhận", value: "CONFIRMED" },
+              { label: "Đã giao", value: "DELIVERED" },
+              { label: "Đã hủy", value: "CANCELLED" },
+            ]}
+          />
+        );
+      },
     },
     {
       title: "Số lượng",
@@ -214,27 +142,14 @@ export default function Orders({
     {
       title: "Hành động",
       key: "action",
-      width: 60,
+      width: 50,
       render: (_: any, record: IOrder) => (
         <Space size="small">
-          <Button
-            type="primary"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          />
           <Button
             type="default"
             size="small"
             icon={<EyeOutlined />}
             onClick={() => handleView(record)}
-          />
-          <Button
-            type="primary"
-            danger
-            size="small"
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
           />
         </Space>
       ),
@@ -245,16 +160,6 @@ export default function Orders({
     <div className="bg-white p-6 rounded-lg shadow h-full flex flex-col">
       <div className="mb-4 flex justify-between items-center flex-shrink-0">
         <h2 className="text-2xl font-bold">Quản lý đơn hàng</h2>
-        <div className="flex items-center gap-2">
-          <Button
-            type="primary"
-            size="large"
-            icon={<PlusOutlined />}
-            onClick={handleCreate}
-          >
-            Tạo đơn hàng
-          </Button>
-        </div>
       </div>
       <Table
         columns={columns}
@@ -275,13 +180,10 @@ export default function Orders({
       />
       <OrderModal
         open={modalOpen}
-        mode={modalMode}
         order={selectedOrder}
         users={users}
-        products={products}
         outlets={outlets}
         onCancel={() => setModalOpen(false)}
-        onSubmit={handleModalSubmit}
       />
       {contextHolder}
     </div>

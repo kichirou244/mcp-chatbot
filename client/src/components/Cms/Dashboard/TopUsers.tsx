@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { Card, Table, Tag, message, Spin, Modal, Descriptions } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { getOrdersByUser } from "../../../actions/order.actions";
+import { getOrdersByUser } from "@/actions/order.actions";
 import {
   CrownOutlined,
   PhoneOutlined,
   EnvironmentOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
-import type { ITopUser, IOrder } from "../../../types/Order";
+import type { ITopUser, IOrder } from "@/types/Order";
 
 interface TopUsersProps {
   topUsers: ITopUser[];
@@ -111,7 +111,8 @@ export default function TopUsers({ topUsers, loading }: TopUsersProps) {
       render: (status: string) => {
         const statusColors: Record<string, string> = {
           PENDING: "orange",
-          COMPLETED: "green",
+          CONFIRMED: "blue",
+          DELIVERED: "green",
           CANCELLED: "red",
         };
         return <Tag color={statusColors[status] || "default"}>{status}</Tag>;

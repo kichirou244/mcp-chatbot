@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Table, Button, Space, Modal } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { IProduct, IProductCreate } from "../../../types/Product";
+import type { IProduct, IProductCreate } from "@/types/Product";
 import {
   createProduct,
   updateProduct,
   deleteProduct,
-} from "../../../actions/product.actions";
-import type { IOutlet } from "../../../types/Outlet";
+} from "@/actions/product.actions";
+import type { IOutlet } from "@/types/Outlet";
 import {
   DeleteOutlined,
   EditOutlined,
@@ -15,7 +15,7 @@ import {
   PlusOutlined,
 } from "@ant-design/icons";
 import ProductModal from "./ProductModal";
-import { useNotification } from "../../../contexts/NotificationContext";
+import { useNotification } from "@/contexts/NotificationContext";
 
 interface ProductsProps {
   products: IProduct[];
@@ -24,11 +24,11 @@ interface ProductsProps {
   onRefresh: () => void;
 }
 
-export default function Products({ 
-  products, 
-  outlets, 
+export default function Products({
+  products,
+  outlets,
   loading,
-  onRefresh 
+  onRefresh,
 }: ProductsProps) {
   const [modal, contextHolder] = Modal.useModal();
   const showNotification = useNotification();

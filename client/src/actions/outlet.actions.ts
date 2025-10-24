@@ -1,4 +1,4 @@
-import type { IOutlet } from "../types/Outlet";
+import type { IOutlet } from "@/types/Outlet";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 

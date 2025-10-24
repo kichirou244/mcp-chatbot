@@ -2,7 +2,7 @@ import type {
   IAuthResponse,
   ILoginRequest,
   IRegisterRequest,
-} from "../types/Auth";
+} from "@/types/Auth";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 

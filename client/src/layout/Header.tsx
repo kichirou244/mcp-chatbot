@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
-import { useNotification } from "../contexts/NotificationContext";
-import { logout } from "../actions/auth.actions";
-import { useAuth } from "../contexts/AuthContext";
+import { useNotification } from "@/contexts/NotificationContext";
+import { logout } from "@/actions/auth.actions";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Header() {
   const { isAuthenticated, logout: authLogout } = useAuth();

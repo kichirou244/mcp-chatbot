@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { IRegisterRequest } from "../../types/Auth";
-import { register } from "../../actions/auth.actions";
-import { useNotification } from "../../contexts/NotificationContext";
+import type { IRegisterRequest } from "@/types/Auth";
+import { register } from "@/actions/auth.actions";
+import { useNotification } from "@/contexts/NotificationContext";
 
 export default function FormRegister({
   setIsLogin,

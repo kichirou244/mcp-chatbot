@@ -534,7 +534,7 @@ export class OrderService {
       }
 
       const [detailRows] = await connection.query(
-        `SELECT od.id, od.order_id AS orderId, od.product_id AS productId, od.quantity, od.unit_price AS unitPrice, p.name AS productName, p.description AS productDescription
+        `SELECT od.id, od.order_id AS orderId, od.product_id AS productId, od.quantity, od.unit_price AS unitPrice, p.name AS productName, p.description AS productDescription, p.outlet_id AS outletId
          FROM order_details od
          LEFT JOIN products p ON od.product_id = p.id
          WHERE od.order_id IN (?)`,
@@ -554,6 +554,7 @@ export class OrderService {
             quantity: d.quantity,
             unitPrice: d.unitPrice,
             subtotal: d.unitPrice * d.quantity,
+            outletId: d.outletId,
           }));
 
         return {
@@ -595,7 +596,7 @@ export class OrderService {
       const orderIds = orders.map((o) => o.id);
 
       const [detailRows] = await connection.query(
-        `SELECT od.id, od.order_id AS orderId, od.product_id AS productId, od.quantity, od.unit_price AS unitPrice, p.name AS productName, p.description AS productDescription
+        `SELECT od.id, od.order_id AS orderId, od.product_id AS productId, od.quantity, od.unit_price AS unitPrice, p.name AS productName, p.description AS productDescription, p.outlet_id AS outletId
          FROM order_details od
          LEFT JOIN products p ON od.product_id = p.id
          WHERE od.order_id IN (?)`,
@@ -615,6 +616,7 @@ export class OrderService {
             quantity: d.quantity,
             unitPrice: d.unitPrice,
             subtotal: d.unitPrice * d.quantity,
+            outletId: d.outletId,
           }));
 
         return {
@@ -630,6 +632,50 @@ export class OrderService {
       return ordersWithDetails;
     } catch (error) {
       throw new AppError(`Failed to get orders for user: ${error}`, 500);
+    } finally {
+      if (connection) connection.release();
+    }
+  }
+
+  async getMonthlyRevenue(): Promise<
+    Array<{
+      period: string;
+      totalRevenue: number;
+      orderCount: number;
+    }>
+  > {
+    let connection;
+    try {
+      connection = await dbPool.getConnection();
+
+      const [rows] = await connection.query(
+        `SELECT 
+           YEAR(date) AS year,
+           MONTH(date) AS month,
+           SUM(total_amount) AS totalRevenue,
+           COUNT(*) AS orderCount
+         FROM orders
+         WHERE status != 'CANCELLED'
+         GROUP BY YEAR(date), MONTH(date)
+         ORDER BY year ASC, month ASC`
+      );
+
+      const aggregated = rows as Array<{
+        year: number;
+        month: number;
+        totalRevenue: number | string | null;
+        orderCount: number | string;
+      }>;
+
+      const response = aggregated.map((row) => ({
+        period: `${row.year}.${row.month}`,
+        totalRevenue: Number(row.totalRevenue ?? 0),
+        orderCount: Number(row.orderCount ?? 0),
+      }));
+
+      return response;
+    } catch (error) {
+      throw new AppError(`Failed to get monthly revenue: ${error}`, 500);
     } finally {
       if (connection) connection.release();
     }

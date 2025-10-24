@@ -1,5 +1,5 @@
-import type { IResponse } from "../types/Global";
-import type { IUserResponse } from "../types/User";
+import type { IResponse } from "@/types/Global";
+import type { IUserResponse } from "@/types/User";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 

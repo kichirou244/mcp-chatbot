@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import Sidebar from "../../components/Cms/Sidebar";
-import Products from "../../components/Cms/Products/Products";
-import Header from "../../layout/Header";
-import { getProducts } from "../../actions/product.actions";
-import { getOutlets } from "../../actions/outlet.actions";
-import type { IProduct } from "../../types/Product";
-import type { IOutlet } from "../../types/Outlet";
-import { useNotification } from "../../contexts/NotificationContext";
+import Sidebar from "@/components/Cms/Sidebar";
+import Products from "@/components/Cms/Products/Products";
+import Header from "@/layout/Header";
+import { getProducts } from "@/actions/product.actions";
+import { getOutlets } from "@/actions/outlet.actions";
+import type { IProduct } from "@/types/Product";
+import type { IOutlet } from "@/types/Outlet";
+import { useNotification } from "@/contexts/NotificationContext";
 
 const ProductsPage = () => {
   const showNotification = useNotification();

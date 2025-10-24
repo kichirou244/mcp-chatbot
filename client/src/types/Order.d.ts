@@ -65,3 +65,9 @@ export interface ITopUser {
   orderCount: number;
   lastOrderDate: string;
 }
+
+export interface IOrderRevenue {
+  period: string;
+  totalRevenue: number;
+  orderCount: number;
+}

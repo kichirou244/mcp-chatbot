@@ -1,6 +1,6 @@
 import { Modal, Form, Input, message } from "antd";
 import { useEffect } from "react";
-import type { IOutlet } from "../../../types/Outlet";
+import type { IOutlet } from "@/types/Outlet";
 
 interface OutletModalProps {
   open: boolean;

@@ -1,7 +1,7 @@
 import { Modal, Form, Input, InputNumber, Select, message } from "antd";
 import { useEffect } from "react";
-import type { IProduct, IProductCreate } from "../../../types/Product";
-import type { IOutlet } from "../../../types/Outlet";
+import type { IProduct, IProductCreate } from "@/types/Product";
+import type { IOutlet } from "@/types/Outlet";
 
 interface ProductModalProps {
   open: boolean;

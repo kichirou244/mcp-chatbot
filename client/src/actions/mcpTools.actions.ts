@@ -1,4 +1,4 @@
-import { mcpClient } from "../client";
+import { mcpClient } from "@/client";
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";

@@ -209,4 +209,16 @@ export class OrderController {
       });
     }
   };
+
+  getMonthlyRevenue = async (_: Request, res: Response): Promise<void> => {
+    try {
+      const revenueData = await this.services.orderService.getMonthlyRevenue();
+      res.status(200).json(revenueData);
+    } catch (error: any) {
+      console.error("Error fetching monthly revenue:", error);
+      res.status(error.statusCode || 500).json({
+        error: error.message || "Internal server error",
+      });
+    }
+  };
 }

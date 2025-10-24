@@ -1,4 +1,4 @@
-import type { IProduct, IProductCreate } from "../types/Product";
+import type { IProduct, IProductCreate } from "@/types/Product";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 

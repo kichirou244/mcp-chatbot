@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import Sidebar from "../../components/Cms/Sidebar";
-import Outlets from "../../components/Cms/Outlets/Outlets";
-import Header from "../../layout/Header";
-import { getOutlets } from "../../actions/outlet.actions";
-import type { IOutlet } from "../../types/Outlet";
-import { useNotification } from "../../contexts/NotificationContext";
+import Sidebar from "@/components/Cms/Sidebar";
+import Outlets from "@/components/Cms/Outlets/Outlets";
+import Header from "@/layout/Header";
+import { getOutlets } from "@/actions/outlet.actions";
+import type { IOutlet } from "@/types/Outlet";
+import { useNotification } from "@/contexts/NotificationContext";
 
 const OutletsPage = () => {
   const showNotification = useNotification();

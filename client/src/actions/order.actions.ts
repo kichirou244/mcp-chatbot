@@ -1,5 +1,12 @@
-import type { IOrder, IOrderCreate, IOrderUpdate, ITopProduct, ITopUser } from "../types/Order";
-import type { IResponse } from "../types/Global";
+import type {
+  IOrder,
+  IOrderCreate,
+  IOrderRevenue,
+  IOrderUpdate,
+  ITopProduct,
+  ITopUser,
+} from "@/types/Order";
+import type { IResponse } from "@/types/Global";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -169,15 +176,12 @@ export async function getOrdersByProduct(
   productId: number
 ): Promise<IResponse<IOrder[]>> {
   try {
-    const response = await fetch(
-      `${BASE_URL}/order/by-product/${productId}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const response = await fetch(`${BASE_URL}/order/by-product/${productId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
 
     if (!response.ok) {
       throw new Error(`Error: ${response.statusText}`);
@@ -210,6 +214,31 @@ export async function getOrdersByUser(
     return { ok: true, data };
   } catch (error) {
     console.error("Error fetching orders by user:", error);
+    return { ok: false, data: [] };
+  }
+}
+
+export async function getMonthlyRevenue(): Promise<
+  IResponse<IOrderRevenue[]>
+> {
+  try {
+    const response = await fetch(`${BASE_URL}/order/monthly-revenue`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
+
+    const data = await response.json() as IOrderRevenue[];
+
+    console.log('Monthly Revenue Data:', data);
+    return { ok: true, data };
+  } catch (error) {
+    console.error("Error fetching monthly revenue:", error);
     return { ok: false, data: [] };
   }
 }
