@@ -1,103 +1,81 @@
-import { dbPool } from "../config/database";
-import { IProduct, IProductWithOutlet } from "../models/Product";
+import { Product, IProduct, IProductWithOutlet } from "../models/Product";
+import { Outlet } from "../models/Outlet";
 import { AppError } from "../utils/errors";
 import { EmbeddingService } from "./EmbeddingService";
 import { OutletService } from "./OutletService";
+import { Op } from "sequelize";
 
 const outletServices = new OutletService();
 const embeddingServices = new EmbeddingService();
 
 export class ProductService {
   async getProducts(): Promise<IProduct[]> {
-    let connection;
-
     try {
-      connection = await dbPool.getConnection();
-
-      const [rows] = await connection.query("SELECT * FROM products");
-
-      const products = (rows as any[]).map((row) => {
-        const { outlet_id, ...rest } = row;
-        return {
-          ...rest,
-          outletId: outlet_id,
-        };
-      }) as IProduct[];
-
-      return products;
+      const products = await Product.findAll();
+      return products.map((product) => product.toJSON());
     } catch (error) {
       throw new AppError(`Error fetching products: ${error}`, 500);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
   async getProductsOutlets(): Promise<IProductWithOutlet[]> {
-    let connection;
-
     try {
-      connection = await dbPool.getConnection();
+      const products = await Product.findAll({
+        include: [
+          {
+            model: Outlet,
+            as: "outlet",
+            attributes: ["name", "address"],
+          },
+        ],
+      });
 
-      const [rows] = await connection.query(
-        `SELECT p.id, p.name, p.description, p.price, p.quantity, p.outlet_id AS outletId, o.name AS outletName, o.address AS outletAddress
-         FROM products p
-         JOIN outlets o ON p.outlet_id = o.id`
-      );
-
-      return rows as IProductWithOutlet[];
+      return products.map((product) => {
+        const productJSON = product.toJSON() as any;
+        return {
+          id: productJSON.id,
+          name: productJSON.name,
+          description: productJSON.description,
+          price: productJSON.price,
+          quantity: productJSON.quantity,
+          outletId: productJSON.outletId,
+          outletName: productJSON.outlet?.name || "",
+          outletAddress: productJSON.outlet?.address || "",
+        };
+      });
     } catch (error) {
       throw new AppError(`Error fetching products with outlets: ${error}`, 500);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
   async getProductById(id: number): Promise<IProduct | null> {
-    let connection;
     try {
-      connection = await dbPool.getConnection();
-      const [rows] = await connection.query(
-        "SELECT * FROM products WHERE id = ?",
-        [id]
-      );
-
-      const products = (rows as any[]).map((row) => ({
-        ...row,
-        outletId: row.outlet_id,
-      })) as IProduct[];
-
-      return products.length > 0 ? products[0] : null;
+      const product = await Product.findByPk(id);
+      return product ? product.toJSON() : null;
     } catch (error) {
       throw new AppError(`Error fetching products by ID: ${error}`, 500);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
   async searchProducts(keyword: string): Promise<IProduct[]> {
-    let connection;
     try {
-      connection = await dbPool.getConnection();
-      const searchTerm = `%${keyword}%`;
-      const [rows] = await connection.query(
-        "SELECT * FROM products WHERE name LIKE ? OR description LIKE ?",
-        [searchTerm, searchTerm]
-      );
+      const products = await Product.findAll({
+        where: {
+          [Op.or]: [
+            { name: { [Op.like]: `%${keyword}%` } },
+            { description: { [Op.like]: `%${keyword}%` } },
+          ],
+        },
+      });
 
-      return rows as IProduct[];
+      return products.map((product) => product.toJSON());
     } catch (error) {
       throw new AppError(`Error searching products: ${error}`, 500);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
   async createProduct(product: Omit<IProduct, "id">): Promise<IProduct> {
-    let connection;
-
     try {
-      connection = await dbPool.getConnection();
-
       const { name, description, price, outletId, quantity } = product;
 
       const outlet = await outletServices.getOutletById(outletId);
@@ -106,17 +84,16 @@ export class ProductService {
         throw new AppError(`Outlet with ID ${outletId} does not exist`, 400);
       }
 
-      const [result] = await connection.query(
-        "INSERT INTO products (name, description, price, outlet_id, quantity) VALUES (?, ?, ?, ?, ?)",
-        [name, description, price, outletId, quantity]
-      );
-
-      await connection.commit();
-
-      const insertId = (result as any).insertId;
+      const newProduct = await Product.create({
+        name,
+        description,
+        price,
+        outletId,
+        quantity,
+      });
 
       const data = {
-        id: insertId,
+        id: newProduct.id,
         outletId: outletId,
         name: name,
         description: description,
@@ -126,19 +103,11 @@ export class ProductService {
         outletAddress: outlet.address,
       };
 
-      await embeddingServices.indexProductWithOutletRows([data]);
+      await embeddingServices.upsertProductWithOutletRows([data]);
 
-      return {
-        id: insertId,
-        name,
-        description,
-        price,
-        outletId,
-      } as IProduct;
+      return newProduct.toJSON();
     } catch (error) {
       throw new AppError(`Error creating product: ${error}`, 500);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
@@ -146,11 +115,8 @@ export class ProductService {
     id: number,
     product: Partial<IProduct>
   ): Promise<IProduct> {
-    let connection;
     try {
-      connection = await dbPool.getConnection();
-
-      const existingProduct = await this.getProductById(id);
+      const existingProduct = await Product.findByPk(id);
       if (!existingProduct) {
         throw new AppError(`Product with ID ${id} does not exist`, 404);
       }
@@ -164,54 +130,29 @@ export class ProductService {
             400
           );
         }
-
-        existingProduct.outletId = product.outletId;
       }
 
-      const updatedProduct = {
-        ...existingProduct,
-        ...product,
-      };
+      await existingProduct.update(product);
 
-      await connection.query(
-        "UPDATE products SET name = ?, description = ?, price = ?, outlet_id = ?, quantity = ? WHERE id = ?",
-        [
-          updatedProduct.name,
-          updatedProduct.description,
-          updatedProduct.price,
-          updatedProduct.outletId,
-          updatedProduct.quantity,
-          id,
-        ]
-      );
-
-      return updatedProduct;
+      return existingProduct.toJSON();
     } catch (error) {
       throw new AppError(`Error updating product: ${error}`, 500);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
   async deleteProduct(id: number): Promise<void> {
-    let connection;
-
     try {
-      connection = await dbPool.getConnection();
-
-      const product = await this.getProductById(id);
+      const product = await Product.findByPk(id);
 
       if (!product) {
         throw new AppError(`Product with ID ${id} does not exist`, 404);
       }
 
-      await connection.query("DELETE FROM products WHERE id = ?", [id]);
+      await product.destroy();
 
       return;
     } catch (error) {
       throw new AppError(`Error deleting product: ${error}`, 500);
-    } finally {
-      if (connection) connection.release();
     }
   }
 }

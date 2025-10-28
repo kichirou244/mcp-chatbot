@@ -2,16 +2,19 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import express, { Request, Response } from "express";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import cors from "cors";
+import "reflect-metadata";
 
 import authRoutes from "./routes/authRoutes";
 import orderRoutes from "./routes/orderRoutes";
 import outletRoutes from "./routes/outletRoutes";
 import productRoutes from "./routes/productRoutes";
 import userRoutes from "./routes/userRoutes";
+import chatSessionRoutes from "./routes/chatSessionRoutes";
 
 import { createServices } from "./services/index.js";
 import { McpResourcesHandler } from "./services/McpResourcesHandler.js";
 import { McpToolsHandler } from "./services/McpToolsHandler.js";
+import { testDbConnection } from "./config/sequelize";
 
 const server = new Server(
   {
@@ -92,8 +95,21 @@ app.use("/order", orderRoutes);
 app.use("/outlet", outletRoutes);
 app.use("/product", productRoutes);
 app.use("/user", userRoutes);
+app.use("/chat-session", chatSessionRoutes);
 
 const PORT = 8080;
-app.listen(PORT, () => {
-  console.log(`MCP listening on port ${PORT}`);
-});
+
+async function startServer() {
+  try {
+    await testDbConnection();
+    
+    app.listen(PORT, () => {
+      console.log(`MCP listening on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+}
+
+startServer();

@@ -14,8 +14,11 @@ export interface ProgressEvent {
 export async function chatWithMcpTools(
   message: string,
   chatHistory: ChatMessage[] = [],
-  onProgress?: (progress: ProgressEvent) => void
+  onProgress?: (progress: ProgressEvent) => void,
+  sessionId?: string | null
 ) {
+  let totalTokens = 0;
+
   try {
     onProgress?.({
       step: "connecting",
@@ -38,6 +41,7 @@ export async function chatWithMcpTools(
     });
 
     const analysis = JSON.parse((analysisResult as any).content[0].text);
+    totalTokens += analysis.tokensUsed || 0;
 
     onProgress?.({
       step: "analyzed",
@@ -58,6 +62,7 @@ export async function chatWithMcpTools(
         });
 
         toolResult = JSON.parse((searchResult as any).content[0].text);
+        totalTokens += toolResult.tokensUsed || 0;
         onProgress?.({
           step: "tool_result",
           message: `Tìm thấy ${toolResult.data?.length || 0} sản phẩm`,
@@ -73,6 +78,7 @@ export async function chatWithMcpTools(
         });
 
         toolResult = JSON.parse((outletResult as any).content[0].text);
+        totalTokens += toolResult.tokensUsed || 0;
         onProgress?.({
           step: "tool_result",
           message: `Tìm thấy ${toolResult.data?.length || 0} cửa hàng`,
@@ -91,6 +97,7 @@ export async function chatWithMcpTools(
         );
 
         toolResult = JSON.parse((productsOutletsResult as any).content[0].text);
+        totalTokens += toolResult.tokensUsed || 0;
         onProgress?.({
           step: "tool_result",
           message: `Tìm thấy ${toolResult.products?.length || 0} sản phẩm và ${
@@ -107,9 +114,11 @@ export async function chatWithMcpTools(
           message,
           conversationContext,
           accessToken,
+          sessionId,
         });
 
         toolResult = JSON.parse((orderResult as any).content[0].text);
+        totalTokens += toolResult.tokensUsed || 0;
         break;
 
       case "none":
@@ -137,6 +146,7 @@ export async function chatWithMcpTools(
     const finalResponse = JSON.parse(
       (finalResponseResult as any).content[0].text
     );
+    totalTokens += finalResponse.tokensUsed || 0;
 
     onProgress?.({
       step: "complete",
@@ -149,6 +159,7 @@ export async function chatWithMcpTools(
       tool: toolName,
       toolResult,
       analysis: analysis.data,
+      tokensUsed: totalTokens,
     };
   } catch (error: any) {
     console.error("[chatWithMcpTools Error]", error);

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Table, Button, Space, Modal, Select } from "antd";
+import { Table, Button, Modal, Select } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { IOrder } from "@/types/Order";
 
@@ -56,7 +56,7 @@ export default function Orders({
       title: "Khách hàng",
       dataIndex: "userId",
       key: "userId",
-      width: 120,
+      width: 15,
       render: (userId: number) => {
         const user = users.find((u) => u.id === userId);
         return user ? `${user.name}` : `KH #${userId}`;
@@ -66,7 +66,7 @@ export default function Orders({
       title: "Ngày đặt",
       dataIndex: "date",
       key: "date",
-      width: 100,
+      width: 15,
       sorter: (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
       render: (date: string) => new Date(date).toLocaleString("vi-VN"),
     },
@@ -74,7 +74,7 @@ export default function Orders({
       title: "Tổng tiền",
       dataIndex: "totalAmount",
       key: "totalAmount",
-      width: 100,
+      width: 15,
       sorter: (a, b) => a.totalAmount - b.totalAmount,
       filters: [
         { text: "< 1.000k", value: "1.000.000" },
@@ -100,7 +100,7 @@ export default function Orders({
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 90,
+      width: 10,
       filters: [
         { text: "Chờ xử lý", value: "PENDING" },
         { text: "Đã xác nhận", value: "CONFIRMED" },
@@ -116,7 +116,7 @@ export default function Orders({
               handleStatusChange(record.orderId, newStatus)
             }
             style={{
-              width: 140,
+              width: 100,
             }}
             options={[
               { label: "Chờ xử lý", value: "PENDING" },
@@ -131,7 +131,7 @@ export default function Orders({
     {
       title: "Số lượng",
       key: "itemCount",
-      width: 50,
+      width: 10,
       align: "center",
       render: (_, record) => (
         <span className="font-semibold">
@@ -142,16 +142,14 @@ export default function Orders({
     {
       title: "Hành động",
       key: "action",
-      width: 50,
+      width: 10,
       render: (_: any, record: IOrder) => (
-        <Space size="small">
-          <Button
-            type="default"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => handleView(record)}
-          />
-        </Space>
+        <Button
+          type="default"
+          size="small"
+          icon={<EyeOutlined />}
+          onClick={() => handleView(record)}
+        />
       ),
     },
   ];

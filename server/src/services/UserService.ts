@@ -1,40 +1,29 @@
-import { dbPool } from "../config/database";
+import { User } from "../models/User";
 import { IUserResponse } from "../models/User";
 import { AppError } from "../utils/errors";
 
 export class UserService {
   async getUserById(userId: number): Promise<IUserResponse | null> {
-    let connection;
-
     try {
-      connection = await dbPool.getConnection();
+      const user = await User.findByPk(userId, {
+        attributes: ["id", "username", "name", "phone", "address"],
+      });
 
-      const [rows] = await connection.query(
-        "SELECT * FROM users WHERE id = ?",
-        [userId]
-      );
-      const users = rows as IUserResponse[];
-
-      return users.length > 0 ? users[0] : null;
+      return user ? user.toJSON() : null;
     } catch (error) {
       throw new AppError(`Error fetching user: ${error}`, 500);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
   async getUsers(): Promise<IUserResponse[]> {
-    let connection;
-
     try {
-      connection = await dbPool.getConnection();
+      const users = await User.findAll({
+        attributes: ["id", "username", "name", "phone", "address"],
+      });
 
-      const [rows] = await connection.query("SELECT * FROM users");
-      return rows as IUserResponse[];
+      return users.map((user) => user.toJSON());
     } catch (error) {
       throw new AppError(`Error fetching users: ${error}`, 500);
-    } finally {
-      if (connection) connection.release();
     }
   }
 }

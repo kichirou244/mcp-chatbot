@@ -2,6 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import type { ChatMessage, ProgressEvent } from "../actions/mcpTools.actions";
 import ReactMarkdown from "react-markdown";
 import { chatWithMcpTools } from "../actions/mcpTools.actions";
+import {
+  createChatSession,
+  addChatMessage,
+  endSession,
+} from "../actions/chatSession.actions";
 
 interface Message {
   id: string;
@@ -28,15 +33,68 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const generateSessionId = () => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 15);
+    return `session_${timestamp}_${random}`;
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (isOpen && !sessionId) {
+      const newSessionId = generateSessionId();
+      setSessionId(newSessionId);
+
+      const userId = localStorage.getItem("userId");
+      createChatSession(newSessionId, userId ? parseInt(userId) : null)
+        .then((result) => {
+          if (result.ok && result.data) {
+            console.log("[Session] Created:", result.data);
+          }
+        })
+        .catch((error) => {
+          console.error("[Session] Failed to create:", error);
+        });
+    }
+  }, [isOpen, sessionId]);
+
+  useEffect(() => {
+    if (!isOpen && sessionId) {
+      endSession(sessionId).catch(console.error);
+      setSessionId(null);
+    }
+  }, [isOpen, sessionId]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (sessionId) {
+        const blob = new Blob(
+          [JSON.stringify({ sessionId: sessionId })],
+          { type: "application/json" }
+        );
+        navigator.sendBeacon(
+          `${import.meta.env.VITE_BASE_URL}/chat-session/${sessionId}/end`,
+          blob
+        );
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [sessionId]);
 
   const buildChatHistory = (): ChatMessage[] => {
     return messages
@@ -62,6 +120,10 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
     setInputMessage("");
     setIsLoading(true);
 
+    if (sessionId) {
+      addChatMessage(sessionId, "user", currentInput).catch(console.error);
+    }
+
     const progressMessageId = `progress-${Date.now()}`;
     const progressMessage: Message = {
       id: progressMessageId,
@@ -85,17 +147,28 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
                 : msg
             )
           );
-        }
+        },
+        sessionId
       );
 
       setMessages((prev) => prev.filter((msg) => msg.id !== progressMessageId));
 
       if (response.success) {
+        if (sessionId) {
+          addChatMessage(
+            sessionId,
+            "assistant",
+            response.response,
+            response.tool || null,
+            response.tokensUsed || 0
+          ).catch(console.error);
+        }
+
         if (response.tool && response.tool !== "none") {
           const systemMessage: Message = {
             id: `system-${Date.now()}`,
             type: "system",
-            content: `Đã sử dụng: ${response.tool}`,
+            content: `Đã sử dụng: ${response.tool} (${response.tokensUsed || 0} tokens)`,
             timestamp: new Date(),
             tool: response.tool,
           };

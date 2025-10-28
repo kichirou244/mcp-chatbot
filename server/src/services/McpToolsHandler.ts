@@ -247,7 +247,7 @@ export class McpToolsHandler {
     Câu hỏi hiện tại của người dùng: "${message}"`;
 
     const response = await agent.ask("gemini-2.5-flash", prompt);
-    const analysis = this.parseAIResponse(response);
+    const analysis = this.parseAIResponse(response.text);
 
     console.log("[Analyze Intent] Response:", analysis);
 
@@ -259,6 +259,7 @@ export class McpToolsHandler {
             success: true,
             tool: "analyze_intent",
             data: analysis,
+            tokensUsed: response.tokensUsed,
           }),
         },
       ],
@@ -268,6 +269,7 @@ export class McpToolsHandler {
   private async handleSearchProducts(args: any) {
     const { query, conversationContext = "" } = args;
     const agent = AiAgentFactory.create("gemini");
+    let totalTokens = 0;
 
     try {
       const allProductsWithOutlets: IProductWithOutlet[] =
@@ -283,6 +285,7 @@ export class McpToolsHandler {
                 tool: "search_products",
                 data: [],
                 message: "Không tìm thấy sản phẩm nào trong cơ sở dữ liệu.",
+                tokensUsed: 0,
               }),
             },
           ],
@@ -299,8 +302,9 @@ Câu hỏi hiện tại: "${query}"
 Hãy tạo câu truy vấn ngắn gọn (1-2 câu) chứa đầy đủ thông tin cần thiết để tìm sản phẩm.
 Chỉ trả về câu truy vấn, không giải thích.`;
 
-        enhancedQuery = await agent.ask("gemini-2.5-flash", contextPrompt);
-        enhancedQuery = enhancedQuery.trim();
+        const contextResponse = await agent.ask("gemini-2.5-flash", contextPrompt);
+        enhancedQuery = contextResponse.text.trim();
+        totalTokens += contextResponse.tokensUsed;
       }
 
       const ragResults =
@@ -367,7 +371,8 @@ Chỉ trả về câu truy vấn, không giải thích.`;
           "gemini-2.5-flash",
           rankingPrompt
         );
-        const ranking = this.parseAIResponse(rankingResponse);
+        totalTokens += rankingResponse.tokensUsed;
+        const ranking = this.parseAIResponse(rankingResponse.text);
 
         finalResults = resultData.filter((p) =>
           ranking.selectedProducts.some(
@@ -388,6 +393,7 @@ Chỉ trả về câu truy vấn, không giải thích.`;
               searchMethod:
                 ragResults.length > 0 ? "vector_search" : "keyword_fallback",
               totalFound: searchResults.length,
+              tokensUsed: totalTokens,
             }),
           },
         ],
@@ -413,6 +419,7 @@ Chỉ trả về câu truy vấn, không giải thích.`;
   private async handleSearchOutlets(args: any) {
     const { query, conversationContext = "" } = args;
     const agent = AiAgentFactory.create("gemini");
+    let totalTokens = 0;
 
     try {
       console.log(`[RAG Search Outlets] Query: "${query}"`);
@@ -428,6 +435,7 @@ Chỉ trả về câu truy vấn, không giải thích.`;
                 success: false,
                 tool: "search_outlets",
                 error: "Không tìm thấy cửa hàng nào trong cơ sở dữ liệu.",
+                tokensUsed: 0,
               }),
             },
           ],
@@ -444,8 +452,9 @@ Câu hỏi hiện tại: "${query}"
 Hãy tạo câu truy vấn ngắn gọn (1-2 câu) chứa đầy đủ thông tin về cửa hàng cần tìm.
 Chỉ trả về câu truy vấn, không giải thích.`;
 
-        enhancedQuery = await agent.ask("gemini-2.5-flash", contextPrompt);
-        enhancedQuery = enhancedQuery.trim();
+        const contextResponse = await agent.ask("gemini-2.5-flash", contextPrompt);
+        enhancedQuery = contextResponse.text.trim();
+        totalTokens += contextResponse.tokensUsed;
         console.log(`[RAG Outlets] Enhanced query: "${enhancedQuery}"`);
       }
 
@@ -494,7 +503,8 @@ Trả về JSON:
 }`;
 
         const matchResponse = await agent.ask("gemini-2.5-flash", matchPrompt);
-        const matchResult = this.parseAIResponse(matchResponse);
+        totalTokens += matchResponse.tokensUsed;
+        const matchResult = this.parseAIResponse(matchResponse.text);
 
         matchedOutlets = allOutlets.filter((o) =>
           matchResult.matchedOutlets.includes(o.id)
@@ -514,6 +524,7 @@ Trả về JSON:
                 outletIdsFromRAG.size > 0
                   ? "vector_search"
                   : "keyword_fallback",
+              tokensUsed: totalTokens,
             }),
           },
         ],
@@ -539,6 +550,7 @@ Trả về JSON:
   private async handleSearchProductsAndOutlets(args: any) {
     const { query, conversationContext = "" } = args;
     const agent = AiAgentFactory.create("gemini");
+    let totalTokens = 0;
 
     try {
       console.log(`[RAG Search Products & Outlets] Query: "${query}"`);
@@ -556,6 +568,7 @@ Trả về JSON:
                 tool: "search_products_and_outlets",
                 error:
                   "Không tìm thấy sản phẩm hoặc cửa hàng nào trong cơ sở dữ liệu.",
+                tokensUsed: 0,
               }),
             },
           ],
@@ -572,8 +585,9 @@ Câu hỏi hiện tại: "${query}"
 Hãy tạo câu truy vấn ngắn gọn (1-2 câu) chứa đầy đủ thông tin về sản phẩm và cửa hàng.
 Chỉ trả về câu truy vấn, không giải thích.`;
 
-        enhancedQuery = await agent.ask("gemini-2.5-flash", contextPrompt);
-        enhancedQuery = enhancedQuery.trim();
+        const contextResponse = await agent.ask("gemini-2.5-flash", contextPrompt);
+        enhancedQuery = contextResponse.text.trim();
+        totalTokens += contextResponse.tokensUsed;
         console.log(
           `[RAG Products & Outlets] Enhanced query: "${enhancedQuery}"`
         );
@@ -652,7 +666,8 @@ Trả về JSON:
           "gemini-2.5-flash",
           rankingPrompt
         );
-        const ranking = this.parseAIResponse(rankingResponse);
+        totalTokens += rankingResponse.tokensUsed;
+        const ranking = this.parseAIResponse(rankingResponse.text);
 
         finalResults = matched.filter((p: IProductWithOutlet) =>
           ranking.selected.some(
@@ -677,6 +692,7 @@ Trả về JSON:
               searchMethod:
                 ragResults.length > 0 ? "vector_search" : "keyword_fallback",
               totalFound: searchResults.length,
+              tokensUsed: totalTokens,
             }),
           },
         ],
@@ -700,8 +716,14 @@ Trả về JSON:
   }
 
   private async handleCreateOrder(args: any) {
-    const { message, conversationContext = "", accessToken } = args;
+    const {
+      message,
+      conversationContext = "",
+      accessToken,
+      sessionDbId,
+    } = args;
     const agent = AiAgentFactory.create("gemini");
+    let totalTokens = 0;
 
     try {
       const allProducts =
@@ -716,6 +738,7 @@ Trả về JSON:
                 success: false,
                 tool: "create_order",
                 error: "Không tìm thấy sản phẩm nào để đặt hàng",
+                tokensUsed: 0,
               }),
             },
           ],
@@ -772,10 +795,11 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
         "gemini-2.5-flash",
         extractPrompt
       );
+      totalTokens += extractResponse.tokensUsed;
 
-      console.log("[Extract Response]", extractResponse);
+      console.log("[Extract Response]", extractResponse.text);
 
-      const extraction = this.parseAIResponse(extractResponse);
+      const extraction = this.parseAIResponse(extractResponse.text);
 
       if (!extraction.isBuyIntent) {
         return {
@@ -788,6 +812,7 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
                 isBuyIntent: false,
                 message: "Đây không phải là yêu cầu đặt hàng.",
                 reasoning: extraction.reasoning,
+                tokensUsed: totalTokens,
               }),
             },
           ],
@@ -807,6 +832,7 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
                 suggestion: "Vui lòng nói rõ sản phẩm bạn muốn mua",
                 availableProducts: allProducts.slice(0, 5),
                 reasoning: extraction.reasoning,
+                tokensUsed: totalTokens,
               }),
             },
           ],
@@ -885,6 +911,13 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
             (sum, item) => sum + item.price * item.quantity,
             0
           );
+
+          if (sessionDbId) {
+            await this.services.chatSessionService.linkOrderToSession(
+              sessionDbId,
+              orderResult.orderId
+            );
+          }
 
           return {
             content: [
@@ -987,6 +1020,13 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
         0
       );
 
+      if (sessionDbId) {
+        await this.services.chatSessionService.linkOrderToSession(
+          sessionDbId,
+          orderResult.orderId
+        );
+      }
+
       return {
         content: [
           {
@@ -1014,6 +1054,7 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
               },
               items: validatedItems,
               totalAmount,
+              tokensUsed: totalTokens,
             }),
           },
         ],
@@ -1059,7 +1100,7 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
   private async handleGenerateFinalResponse(args: any) {
     const { message, conversationContext = "", tool, toolResult } = args;
 
-    const response = await this.generateFinalResponse(
+    const result = await this.generateFinalResponse(
       message,
       conversationContext,
       tool,
@@ -1073,7 +1114,8 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
           text: JSON.stringify({
             success: true,
             tool: "generate_final_response",
-            response: response,
+            response: result.text,
+            tokensUsed: result.tokensUsed,
           }),
         },
       ],
@@ -1085,7 +1127,7 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
     conversationContext: string,
     tool: string,
     toolResult: any
-  ): Promise<string> {
+  ): Promise<{ text: string; tokensUsed: number }> {
     const agent = AiAgentFactory.create("gemini");
 
     let orderSummary = "";
@@ -1133,6 +1175,10 @@ HƯỚNG DẪN:
 
 Trả lời:`;
 
-    return await agent.ask("gemini-2.5-flash", prompt);
+    const response = await agent.ask("gemini-2.5-flash", prompt);
+    return {
+      text: response.text,
+      tokensUsed: response.tokensUsed,
+    };
   }
 }

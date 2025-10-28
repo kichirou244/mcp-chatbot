@@ -8,6 +8,7 @@ const Sidebar = () => {
     { path: "/cms/outlets", label: "Cửa hàng" },
     { path: "/cms/products", label: "Sản phẩm" },
     { path: "/cms/orders", label: "Hoá đơn" },
+    { path: "/cms/chat-sessions", label: "Chat Sessions" },
   ];
 
   return (

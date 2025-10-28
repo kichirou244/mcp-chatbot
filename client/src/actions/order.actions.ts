@@ -234,8 +234,6 @@ export async function getMonthlyRevenue(): Promise<
     }
 
     const data = await response.json() as IOrderRevenue[];
-
-    console.log('Monthly Revenue Data:', data);
     return { ok: true, data };
   } catch (error) {
     console.error("Error fetching monthly revenue:", error);

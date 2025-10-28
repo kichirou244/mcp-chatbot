@@ -1,70 +1,36 @@
-import { dbPool } from "../config/database";
-import { IOutlet } from "../models/Outlet";
+import { Outlet, IOutlet } from "../models/Outlet";
 
 export class OutletService {
   async getOutletById(id: number): Promise<IOutlet | null> {
-    let connection;
-
     try {
-      connection = await dbPool.getConnection();
-
-      const [rows] = await connection.query(
-        "SELECT * FROM outlets WHERE id = ?",
-        [id]
-      );
-
-      const outlets = rows as IOutlet[];
-
-      return outlets.length ? outlets[0] : null;
+      const outlet = await Outlet.findByPk(id);
+      return outlet ? outlet.toJSON() : null;
     } catch (error) {
       throw new Error(`Error fetching outlet by ID: ${error}`);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
   async getOutlets(): Promise<IOutlet[]> {
-    let connection;
-
     try {
-      connection = await dbPool.getConnection();
-
-      const [rows] = await connection.query("SELECT * FROM outlets");
-
-      const outlets = rows as IOutlet[];
-
-      return outlets;
+      const outlets = await Outlet.findAll();
+      return outlets.map((outlet) => outlet.toJSON());
     } catch (error) {
       throw new Error(`Error fetching outlet: ${error}`);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
   async createOutlet(outlet: Omit<IOutlet, "id">): Promise<IOutlet> {
-    let connection;
-
     try {
-      connection = await dbPool.getConnection();
-
       const { name, address } = outlet;
 
-      const [result] = await connection.query(
-        "INSERT INTO outlets (name, address) VALUES (?, ?)",
-        [name, address]
-      );
-
-      const insertId = (result as any).insertId;
-
-      return {
-        id: insertId,
+      const newOutlet = await Outlet.create({
         name,
         address,
-      } as IOutlet;
+      });
+
+      return newOutlet.toJSON();
     } catch (error) {
       throw new Error(`Error creating outlet: ${error}`);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
@@ -72,52 +38,34 @@ export class OutletService {
     id: number,
     outlet: Partial<IOutlet>
   ): Promise<IOutlet | null> {
-    let connection;
-
     try {
-      connection = await dbPool.getConnection();
-
-      const existingOutlet = await this.getOutletById(id);
+      const existingOutlet = await Outlet.findByPk(id);
 
       if (!existingOutlet) {
         throw new Error(`Outlet with ID ${id} does not exist`);
       }
 
-      const updatedOutlet = { ...existingOutlet, ...outlet };
+      await existingOutlet.update(outlet);
 
-      const { name, address } = updatedOutlet;
-
-      await connection.query(
-        "UPDATE outlets SET name = ?, address = ? WHERE id = ?",
-        [name, address, id]
-      );
-
-      return updatedOutlet;
+      return existingOutlet.toJSON();
     } catch (error) {
       throw new Error(`Error updating outlet: ${error}`);
-    } finally {
-      if (connection) connection.release();
     }
   }
 
   async deleteOutlet(id: number): Promise<void> {
-    let connection;
     try {
-      connection = await dbPool.getConnection();
-
-      const existingOutlet = await this.getOutletById(id);
+      const existingOutlet = await Outlet.findByPk(id);
 
       if (!existingOutlet) {
         throw new Error(`Outlet with ID ${id} does not exist`);
       }
 
-      await connection.query("DELETE FROM outlets WHERE id = ?", [id]);
+      await existingOutlet.destroy();
 
       return;
     } catch (error) {
       throw new Error(`Error deleting outlet: ${error}`);
-    } finally {
-      if (connection) connection.release();
     }
   }
 }

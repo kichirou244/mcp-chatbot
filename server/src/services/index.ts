@@ -6,6 +6,7 @@ import { OrderDetailService } from "./OrderDetailService";
 import { ProductService } from "./ProductService";
 import { AiAgent } from "./AiAgent";
 import { EmbeddingService } from "./EmbeddingService";
+import { ChatSessionService } from "./ChatSessionService";
 
 export const createServices = () => {
   const authService = new AuthService();
@@ -16,6 +17,7 @@ export const createServices = () => {
   const productService = new ProductService();
   const aiAgent = new AiAgent();
   const embeddingService = new EmbeddingService();
+  const chatSessionService = new ChatSessionService();
 
   return {
     authService,
@@ -26,5 +28,6 @@ export const createServices = () => {
     productService,
     aiAgent,
     embeddingService,
+    chatSessionService,
   };
 };

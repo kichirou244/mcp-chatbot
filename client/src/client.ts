@@ -30,7 +30,6 @@ export class MCPClient {
         this.transport = new SSEClientTransport(new URL(url));
         await this.client.connect(this.transport);
         this.isConnected = true;
-        console.log("[MCP Client] Connected to", url);
       } catch (error) {
         this.connectionPromise = null;
         throw error;

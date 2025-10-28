@@ -39,7 +39,7 @@ export class EmbeddingService {
       typeof meta.price === "number"
         ? meta.price.toFixed(2)
         : String(meta.price ?? "");
-        
+
     const desc = meta.description ? ` Description: ${meta.description}.` : "";
     const outletAddr = meta.outletAddress ? `, ${meta.outletAddress}` : "";
 
@@ -95,7 +95,7 @@ export class EmbeddingService {
     }
   }
 
-  async indexProductWithOutletRows(rows: IProductWithOutlet[]): Promise<void> {
+  async upsertProductWithOutletRows(rows: IProductWithOutlet[]): Promise<void> {
     const docs: ProductOutletMetadata[] = (rows || []).map((p) => ({
       productId: p.id,
       productName: p.name,

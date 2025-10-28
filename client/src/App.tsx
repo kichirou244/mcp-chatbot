@@ -6,6 +6,7 @@ import CmsDashboard from "./pages/Cms/Dashboard";
 import CmsProducts from "./pages/Cms/Products";
 import CmsOrders from "./pages/Cms/Orders";
 import CmsOutlets from "./pages/Cms/Outlets";
+import ChatSessionsPage from "./pages/Cms/ChatSessions";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 
@@ -72,6 +73,14 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <CmsOutlets />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cms/chat-sessions"
+              element={
+                <ProtectedRoute>
+                  <ChatSessionsPage />
                 </ProtectedRoute>
               }
             />

@@ -16,7 +16,7 @@ async function main() {
   }
 
   console.log("[Indexer] Upserting to Pinecone...");
-  await embeddingService.indexProductWithOutletRows(rows);
+  await embeddingService.upsertProductWithOutletRows(rows);
   console.log("[Indexer] Done.");
 }
 
