@@ -1,6 +1,6 @@
 import { Pinecone } from "@pinecone-database/pinecone";
 import { AppError } from "../utils/errors";
-import type { IProductWithOutlet } from "../models/Product";
+import type { IProductWithOutlet } from "../database/models";
 import { GoogleGenAI } from "@google/genai";
 
 export interface ProductOutletMetadata {
@@ -107,6 +107,47 @@ export class EmbeddingService {
       outletAddress: p.outletAddress,
     }));
     await this.upsertProductsOutlets(docs);
+  }
+
+  async updateProdcutOutlet(doc: ProductOutletMetadata): Promise<void> {
+    if (!doc) return;
+    try {
+      const index = this.pinecone
+        .index(this.indexName)
+        .namespace(this.namespace);
+      
+      const text = this.buildDocumentText(doc);
+      const embeddings = await this.embedTexts([text]);
+
+      const record = {
+        id: `product-${doc.productId}`,
+        values: embeddings[0],
+        metadata: doc as any,
+      };
+
+      await index.upsert([record]);
+
+      console.log(
+        `[Pinecone RAG] Updated product vector for product ID ${doc.productId}`
+      );
+    } catch (error: any) {
+      console.error("[Pinecone Upsert Error]", error);
+      throw new AppError(`Failed to upsert to Pinecone: ${error.message}`, 500);
+    }
+  }
+
+  async updateProductWithOutletRow(row: IProductWithOutlet): Promise<void> {
+    const doc: ProductOutletMetadata = {
+      productId: row.id,
+      productName: row.name,
+      description: row.description,
+      price: row.price,
+      quantity: row.quantity,
+      outletId: row.outletId,
+      outletName: row.outletName,
+      outletAddress: row.outletAddress,
+    };
+    await this.updateProdcutOutlet(doc);
   }
 
   async searchProductsOutlets(

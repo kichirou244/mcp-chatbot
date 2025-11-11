@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Helmet } from "react-helmet-async";
 import Sidebar from "@/components/Cms/Sidebar";
 import Header from "@/layout/Header";
 import TopProducts from "@/components/Cms/Dashboard/TopProducts";
@@ -43,19 +44,24 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen">
-      <Header />
-      <div className="flex pt-3">
-        <Sidebar />
-        <div className="ml-64 pt-12 flex-1 p-8 bg-gray-100 min-h-[calc(100vh-1rem)]">
-          <h1 className="text-3xl font-bold mt-2 mb-6">Trang chủ</h1>
+    <>
+      <Helmet>
+        <title>CMS</title>
+      </Helmet>
+      <div className="min-h-screen">
+        <Header />
+        <div className="flex pt-3">
+          <Sidebar />
+          <div className="ml-64 pt-12 flex-1 p-8 bg-gray-100 min-h-[calc(100vh-1rem)]">
+            <h1 className="text-3xl font-bold mt-2 mb-6">Trang chủ</h1>
 
-          <Chart monthlyRevenue={monthlyRevenue} loading={loading} />
-          <TopProducts topProducts={topProducts} loading={loading} />
-          <TopUsers topUsers={topUsers} loading={loading} />
+            <Chart monthlyRevenue={monthlyRevenue} loading={loading} />
+            <TopProducts topProducts={topProducts} loading={loading} />
+            <TopUsers topUsers={topUsers} loading={loading} />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -81,7 +81,7 @@ export function Products() {
               </p>
               <div className="flex justify-between items-center pt-2 border-t border-gray-100 mt-auto">
                 <p className="text-xl font-bold text-green-600">
-                  {product.price.toLocaleString("vi-VN")}.000 vnđ
+                  {product.price.toLocaleString("vi-VN")} vnđ
                 </p>
                 <div className="text-right">
                   <p className="text-xs text-gray-500">

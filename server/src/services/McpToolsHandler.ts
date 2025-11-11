@@ -5,7 +5,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { createServices } from "./index.js";
 import { AiAgentFactory } from "../aiAgents/aiAgentFactory";
-import { IProduct, IProductWithOutlet } from "../models/Product.js";
+import { IProduct, IProductWithOutlet } from "../database/models/index.js";
 import { JwtUtility } from "../utils/jwtUtility";
 
 export class McpToolsHandler {
@@ -302,7 +302,10 @@ Câu hỏi hiện tại: "${query}"
 Hãy tạo câu truy vấn ngắn gọn (1-2 câu) chứa đầy đủ thông tin cần thiết để tìm sản phẩm.
 Chỉ trả về câu truy vấn, không giải thích.`;
 
-        const contextResponse = await agent.ask("gemini-2.5-flash", contextPrompt);
+        const contextResponse = await agent.ask(
+          "gemini-2.5-flash",
+          contextPrompt
+        );
         enhancedQuery = contextResponse.text.trim();
         totalTokens += contextResponse.tokensUsed;
       }
@@ -452,7 +455,10 @@ Câu hỏi hiện tại: "${query}"
 Hãy tạo câu truy vấn ngắn gọn (1-2 câu) chứa đầy đủ thông tin về cửa hàng cần tìm.
 Chỉ trả về câu truy vấn, không giải thích.`;
 
-        const contextResponse = await agent.ask("gemini-2.5-flash", contextPrompt);
+        const contextResponse = await agent.ask(
+          "gemini-2.5-flash",
+          contextPrompt
+        );
         enhancedQuery = contextResponse.text.trim();
         totalTokens += contextResponse.tokensUsed;
         console.log(`[RAG Outlets] Enhanced query: "${enhancedQuery}"`);
@@ -585,7 +591,10 @@ Câu hỏi hiện tại: "${query}"
 Hãy tạo câu truy vấn ngắn gọn (1-2 câu) chứa đầy đủ thông tin về sản phẩm và cửa hàng.
 Chỉ trả về câu truy vấn, không giải thích.`;
 
-        const contextResponse = await agent.ask("gemini-2.5-flash", contextPrompt);
+        const contextResponse = await agent.ask(
+          "gemini-2.5-flash",
+          contextPrompt
+        );
         enhancedQuery = contextResponse.text.trim();
         totalTokens += contextResponse.tokensUsed;
         console.log(
@@ -716,12 +725,7 @@ Trả về JSON:
   }
 
   private async handleCreateOrder(args: any) {
-    const {
-      message,
-      conversationContext = "",
-      accessToken,
-      sessionDbId,
-    } = args;
+    const { message, conversationContext = "", accessToken, sessionId } = args;
     const agent = AiAgentFactory.create("gemini");
     let totalTokens = 0;
 
@@ -912,9 +916,9 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
             0
           );
 
-          if (sessionDbId) {
+          if (sessionId) {
             await this.services.chatSessionService.linkOrderToSession(
-              sessionDbId,
+              sessionId,
               orderResult.orderId
             );
           }
@@ -1013,16 +1017,21 @@ Chú ý: Chỉ điền guestInfo nếu user cung cấp rõ ràng trong message`;
         }
       );
 
-      console.log("[Order] Creation Result:", orderResult);
+      if (sessionId && orderResult.userId) {
+        await this.services.chatSessionService.updateSessionUserId(
+          sessionId,
+          orderResult.userId
+        );
+      }
 
       const totalAmount = validatedItems.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0
       );
 
-      if (sessionDbId) {
+      if (sessionId) {
         await this.services.chatSessionService.linkOrderToSession(
-          sessionDbId,
+          sessionId,
           orderResult.orderId
         );
       }

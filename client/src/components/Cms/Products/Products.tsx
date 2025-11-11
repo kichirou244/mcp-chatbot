@@ -130,7 +130,7 @@ export default function Products({
       sorter: (a, b) => a.price - b.price,
       render: (price: number) => (
         <span className="font-semibold text-green-600 block text-center">
-          {price.toLocaleString("vi-VN")}.000
+          {price.toLocaleString("vi-VN")} vnđ
         </span>
       ),
     },

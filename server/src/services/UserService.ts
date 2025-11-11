@@ -1,5 +1,4 @@
-import { User } from "../models/User";
-import { IUserResponse } from "../models/User";
+import { User, IUserResponse } from "../database/models";
 import { AppError } from "../utils/errors";
 
 export class UserService {

@@ -1,4 +1,14 @@
-import { ChatSession, ChatMessage, SessionOrder } from "../models/ChatSession";
+import {
+  ChatSession,
+  ChatMessage,
+  SessionOrder,
+  ISessionStats,
+  IOrderResponse,
+  Order,
+  OrderDetail,
+  Product,
+  User,
+} from "../database/models";
 import { AppError } from "../utils/errors";
 
 export class ChatSessionService {
@@ -60,10 +70,19 @@ export class ChatSessionService {
   async getSessionHistoryBySessionId(sessionId: string): Promise<{
     session: ChatSession;
     messages: ChatMessage[];
+    orders: IOrderResponse[];
   }> {
     try {
       const session = await ChatSession.findOne({
         where: { sessionId },
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["id", "username", "name", "phone", "address"],
+            required: false,
+          },
+        ],
       });
 
       if (!session) {
@@ -75,9 +94,63 @@ export class ChatSessionService {
         order: [["createdAt", "ASC"]],
       });
 
+      const sessionOrders = await SessionOrder.findAll({
+        where: { sessionId: session.id },
+        include: [
+          {
+            model: Order,
+            as: "order",
+            include: [
+              {
+                model: OrderDetail,
+                as: "orderDetails",
+                include: [
+                  {
+                    model: Product,
+                    as: "product",
+                    attributes: ["name", "description", "outletId"],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+      const orders: IOrderResponse[] = sessionOrders
+        .map((sessionOrder) => {
+          const sessionOrderJSON = sessionOrder.toJSON() as any;
+          const orderData = sessionOrderJSON.order;
+
+          if (!orderData) {
+            return null;
+          }
+
+          return {
+            orderId: orderData.id,
+            userId: orderData.userId,
+            totalAmount: orderData.totalAmount,
+            date: orderData.date,
+            status: orderData.status,
+            orderDetails: (orderData.orderDetails || []).map((detail: any) => ({
+              id: detail.id,
+              orderId: detail.orderId,
+              productId: detail.productId,
+              productName: detail.product?.name || "",
+              productDescription: detail.product?.description || "",
+              quantity: detail.quantity,
+              unitPrice: detail.unitPrice,
+              subtotal: detail.unitPrice * detail.quantity,
+              outletId: detail.product?.outletId || 0,
+            })),
+          };
+        })
+        .filter((order) => order !== null) as IOrderResponse[];
+
       return {
         session,
         messages,
+        orders,
       };
     } catch (error) {
       throw new AppError(`Error fetching session history: ${error}`, 500);
@@ -103,7 +176,7 @@ export class ChatSessionService {
     }
   }
 
-  async getSessionStats(): Promise<any[]> {
+  async getSessionStats(): Promise<ISessionStats[]> {
     try {
       const sessions = await ChatSession.findAll({
         attributes: [
@@ -117,7 +190,8 @@ export class ChatSessionService {
         ],
         include: [
           {
-            association: "user",
+            model: User,
+            as: "user",
             attributes: ["username"],
             required: false,
           },
@@ -126,25 +200,26 @@ export class ChatSessionService {
       });
 
       const statsPromises = sessions.map(async (session) => {
+        const sessionJson = session.toJSON() as any;
         const messageCount = await ChatMessage.count({
-          where: { sessionId: session.id },
+          where: { sessionId: sessionJson.id },
         });
 
         const orderCount = await SessionOrder.count({
-          where: { sessionId: session.id },
+          where: { sessionId: sessionJson.id },
         });
 
         return {
-          id: session.id,
-          sessionId: session.sessionId,
-          userId: session.userId,
-          startDate: session.startDate,
-          endDate: session.endDate,
-          totalTokens: session.totalTokens,
-          status: session.status,
+          id: sessionJson.id,
+          sessionId: sessionJson.sessionId,
+          userId: sessionJson.userId,
+          startDate: sessionJson.startDate,
+          endDate: sessionJson.endDate,
+          totalTokens: sessionJson.totalTokens,
+          status: sessionJson.status,
           messageCount,
           orderCount,
-          userName: (session as any).user?.username || null,
+          username: sessionJson.user?.username || null,
         };
       });
 
@@ -198,6 +273,22 @@ export class ChatSessionService {
       return sessionOrders.map((so) => so.orderId);
     } catch (error) {
       throw new AppError(`Error fetching orders for session: ${error}`, 500);
+    }
+  }
+
+  async updateSessionUserId(sessionId: string, userId: number): Promise<void> {
+    try {
+      const session = await ChatSession.findOne({
+        where: { sessionId },
+      });
+
+      if (!session) {
+        throw new AppError("Session not found", 404);
+      }
+
+      await session.update({ userId });
+    } catch (error) {
+      throw new AppError(`Error updating session userId: ${error}`, 500);
     }
   }
 }

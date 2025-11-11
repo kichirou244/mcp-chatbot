@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { createServices } from "../services";
-import { IOutlet } from "../models/Outlet";
+import { IOutlet } from "../database/models";
 
 export class OutletController {
   private services = createServices();

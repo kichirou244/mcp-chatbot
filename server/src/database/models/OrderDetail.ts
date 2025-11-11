@@ -4,6 +4,7 @@ import {
   Model,
   DataType,
   ForeignKey,
+  BelongsTo,
 } from "sequelize-typescript";
 import { Order } from "./Order";
 import { Product } from "./Product";
@@ -21,6 +22,8 @@ export interface IOrderDetail {
   productId: number;
   quantity: number;
   unitPrice: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface IOrderDetailResponse {
@@ -38,6 +41,15 @@ export interface IOrderDetailResponse {
 @Table({
   tableName: "order_details",
   timestamps: false,
+  underscored: true,
+  indexes: [
+    {
+      fields: ["order_id"],
+    },
+    {
+      fields: ["product_id"],
+    },
+  ],
 })
 export class OrderDetail extends Model<IOrderDetail, IOrderDetailCreate> {
   @Column({
@@ -76,6 +88,9 @@ export class OrderDetail extends Model<IOrderDetail, IOrderDetailCreate> {
   })
   declare unitPrice: number;
 
-  order?: Order;
-  product?: Product;
+  @BelongsTo(() => Order)
+  declare order?: Order;
+
+  @BelongsTo(() => Product)
+  declare product?: Product;
 }

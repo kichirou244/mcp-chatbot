@@ -1,8 +1,5 @@
-import { sequelize } from "../config/sequelize";
-import { Order, IOrderResponse } from "../models/Order";
-import { OrderDetail } from "../models/OrderDetail";
-import { Product } from "../models/Product";
-import { User } from "../models/User";
+import { sequelize } from "../database";
+import { Order, IOrderResponse, OrderDetail, Product, User } from "../database/models";
 import { AppError } from "../utils/errors";
 import { UserService } from "./UserService";
 import { Op, QueryTypes } from "sequelize";

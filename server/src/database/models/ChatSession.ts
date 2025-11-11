@@ -4,6 +4,8 @@ import {
   Model,
   DataType,
   ForeignKey,
+  BelongsTo,
+  HasMany,
 } from "sequelize-typescript";
 import { User } from "./User";
 import { Order } from "./Order";
@@ -16,6 +18,8 @@ export interface IChatSession {
   endDate: Date | null;
   totalTokens: number;
   status: "ACTIVE" | "ENDED";
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface IChatMessage {
@@ -35,14 +39,37 @@ export interface ISessionOrder {
   createdAt: Date;
 }
 
+export interface ISessionStats {
+  id: string;
+  sessionId: string;
+  userId: number | null;
+  startDate: Date;
+  endDate: Date | null;
+  totalTokens: number;
+  status: "ACTIVE" | "ENDED";
+  messageCount: number;
+  orderCount: number;
+  username: string | null;
+}
+
 @Table({
   tableName: "chat_sessions",
   timestamps: false,
+  underscored: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ["session_id"],
+    },
+    {
+      fields: ["user_id"],
+    },
+    {
+      fields: ["status"],
+    },
+  ],
 })
-export class ChatSession extends Model<
-  IChatSession,
-  Omit<IChatSession, "id">
-> {
+export class ChatSession extends Model<IChatSession, Omit<IChatSession, "id">> {
   @Column({
     type: DataType.INTEGER,
     primaryKey: true,
@@ -96,12 +123,27 @@ export class ChatSession extends Model<
   })
   declare status: "ACTIVE" | "ENDED";
 
-  user?: User;
+  @BelongsTo(() => User)
+  declare user?: User;
+
+  @HasMany(() => ChatMessage)
+  declare messages?: ChatMessage[];
 }
 
 @Table({
   tableName: "chat_messages",
   timestamps: false,
+  indexes: [
+    {
+      fields: ["session_id"],
+    },
+    {
+      fields: ["role"],
+    },
+    {
+      fields: ["created_at"],
+    },
+  ],
 })
 export class ChatMessage extends Model<IChatMessage, Omit<IChatMessage, "id">> {
   @Column({
@@ -111,6 +153,7 @@ export class ChatMessage extends Model<IChatMessage, Omit<IChatMessage, "id">> {
   })
   declare id: number;
 
+  @ForeignKey(() => ChatSession)
   @Column({
     type: DataType.INTEGER,
     allowNull: false,
@@ -152,13 +195,31 @@ export class ChatMessage extends Model<IChatMessage, Omit<IChatMessage, "id">> {
     field: "created_at",
   })
   declare createdAt: Date;
+
+  @BelongsTo(() => ChatSession)
+  declare session?: ChatSession;
 }
 
 @Table({
   tableName: "session_orders",
   timestamps: false,
+  indexes: [
+    {
+      fields: ["session_id"],
+    },
+    {
+      fields: ["order_id"],
+    },
+    {
+      unique: true,
+      fields: ["session_id", "order_id"],
+    },
+  ],
 })
-export class SessionOrder extends Model<ISessionOrder, Omit<ISessionOrder, "id">> {
+export class SessionOrder extends Model<
+  ISessionOrder,
+  Omit<ISessionOrder, "id">
+> {
   @Column({
     type: DataType.INTEGER,
     primaryKey: true,
@@ -190,7 +251,9 @@ export class SessionOrder extends Model<ISessionOrder, Omit<ISessionOrder, "id">
   })
   declare createdAt: Date;
 
-  // Associations defined in associations.ts
-  order?: any;
-  session?: ChatSession;
+  @BelongsTo(() => Order)
+  declare order?: Order;
+
+  @BelongsTo(() => ChatSession)
+  declare session?: ChatSession;
 }

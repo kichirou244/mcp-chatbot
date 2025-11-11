@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { Helmet } from "react-helmet-async";
 import Header from "@/layout/Header";
 import { Products } from "@/components/Products";
 import { ChatBox } from "@/components/ChatBox";
 import { mcpClient } from "@/client";
+import { endSession } from "@/actions/chatSession.actions";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:8080";
 
@@ -10,6 +12,7 @@ export default function HomePage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     const connectToServer = async () => {
@@ -29,6 +32,27 @@ export default function HomePage() {
       mcpClient.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (sessionId) {
+        endSession(sessionId).catch((error) => {
+          console.error("Error ending session on unload:", error);
+        });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      if (sessionId) {
+        endSession(sessionId).catch((error) => {
+          console.error("Error ending session on unmount:", error);
+        });
+      }
+    };
+  }, [sessionId]);
 
   if (!isConnected) {
     return (
@@ -54,6 +78,9 @@ export default function HomePage() {
 
   return (
     <>
+      <Helmet>
+        <title>Trang chủ</title>
+      </Helmet>
       <div className="min-h-screen bg-gray-50 relative">
         <Header />
 
@@ -85,7 +112,12 @@ export default function HomePage() {
           </svg>
         </button>
 
-        <ChatBox isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        <ChatBox
+          isOpen={isChatOpen}
+          sessionId={sessionId}
+          setSessionId={setSessionId}
+          onClose={() => setIsChatOpen(false)}
+        />
       </div>
     </>
   );

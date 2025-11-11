@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { IUserResponse } from "../models/User";
+import { IUserResponse } from "../database/models";
 import { createServices } from "../services";
 
 export class UserController {

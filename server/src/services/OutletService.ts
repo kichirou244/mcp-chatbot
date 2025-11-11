@@ -1,4 +1,4 @@
-import { Outlet, IOutlet } from "../models/Outlet";
+import { Outlet, IOutlet } from "../database/models";
 
 export class OutletService {
   async getOutletById(id: number): Promise<IOutlet | null> {

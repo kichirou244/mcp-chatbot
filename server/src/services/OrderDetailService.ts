@@ -1,4 +1,4 @@
-import { OrderDetail, IOrderDetailCreate } from "../models/OrderDetail";
+import { OrderDetail, IOrderDetailCreate } from "../database/models";
 import { AppError } from "../utils/errors";
 import { ProductService } from "./ProductService";
 

@@ -1,6 +1,6 @@
 import { createServices } from "./../services/index";
 import { Request, Response } from "express";
-import { IAuthResponse, IUserCreate, IUserLogin } from "../models/User";
+import { IAuthResponse, IUserCreate, IUserLogin } from "../database/models";
 
 export class AuthController {
   private services = createServices();

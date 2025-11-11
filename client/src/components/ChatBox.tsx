@@ -19,10 +19,17 @@ interface Message {
 
 interface ChatBoxProps {
   isOpen: boolean;
+  sessionId: string | null;
+  setSessionId: (id: string | null) => void;
   onClose: () => void;
 }
 
-export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
+export function ChatBox({
+  isOpen,
+  sessionId,
+  setSessionId,
+  onClose,
+}: ChatBoxProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -33,7 +40,6 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -70,31 +76,14 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
 
   useEffect(() => {
     if (!isOpen && sessionId) {
-      endSession(sessionId).catch(console.error);
-      setSessionId(null);
+      try {
+        endSession(sessionId);
+        setSessionId(null);
+      } catch (error) {
+        console.error("Error ending session:", error);
+      }
     }
   }, [isOpen, sessionId]);
-
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (sessionId) {
-        const blob = new Blob(
-          [JSON.stringify({ sessionId: sessionId })],
-          { type: "application/json" }
-        );
-        navigator.sendBeacon(
-          `${import.meta.env.VITE_BASE_URL}/chat-session/${sessionId}/end`,
-          blob
-        );
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [sessionId]);
 
   const buildChatHistory = (): ChatMessage[] => {
     return messages
@@ -168,7 +157,7 @@ export function ChatBox({ isOpen, onClose }: ChatBoxProps) {
           const systemMessage: Message = {
             id: `system-${Date.now()}`,
             type: "system",
-            content: `Đã sử dụng: ${response.tool} (${response.tokensUsed || 0} tokens)`,
+            content: `Đã sử dụng: ${response.tool}`,
             timestamp: new Date(),
             tool: response.tool,
           };

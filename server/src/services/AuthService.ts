@@ -1,5 +1,4 @@
-import { User } from "../models/User";
-import { IAuthResponse, IUserCreate, IUserLogin } from "../models/User";
+import { User, IAuthResponse, IUserCreate, IUserLogin } from "../database/models";
 import { JwtUtility } from "../utils/jwtUtility";
 import { PasswordUtility } from "../utils/passwordUtility";
 import { AppError } from "../utils/errors";

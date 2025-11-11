@@ -14,7 +14,7 @@ import chatSessionRoutes from "./routes/chatSessionRoutes";
 import { createServices } from "./services/index.js";
 import { McpResourcesHandler } from "./services/McpResourcesHandler.js";
 import { McpToolsHandler } from "./services/McpToolsHandler.js";
-import { testDbConnection } from "./config/sequelize";
+import { testDbConnection } from "./database";
 
 const server = new Server(
   {

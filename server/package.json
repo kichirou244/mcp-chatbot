@@ -4,10 +4,17 @@
   "description": "MCP Server",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --inspect src/server.ts",
     "dev:stdio": "tsx src/index.ts",
     "build": "tsc",
-    "index:products-outlets": "tsx src/scripts/indexProductsOutlets.ts"
+    "index:products-outlets": "tsx src/scripts/indexProductsOutlets.ts",
+    "db:migrate": "tsx src/database/migrate.ts",
+    "db:migrate:undo": "tsx src/database/migrate.ts -- --undo",
+    "db:migrate:undo:all": "tsx src/database/migrate.ts -- --undo-all",
+    "db:migrate:status": "tsx src/database/migrate.ts -- --status",
+    "db:seed": "sequelize-cli db:seed:all",
+    "db:seed:undo": "sequelize-cli db:seed:undo:all",
+    "db:reset": "npm run db:migrate:undo:all && npm run db:migrate"
   },
   "dependencies": {
     "@google/genai": "^1.21.0",
@@ -30,7 +37,9 @@
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.10.0",
+    "@types/validator": "^13.15.4",
     "@types/ws": "^8.18.1",
+    "sequelize-cli": "^6.6.3",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

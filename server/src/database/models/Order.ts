@@ -4,9 +4,11 @@ import {
   Model,
   DataType,
   ForeignKey,
+  BelongsTo,
+  HasMany,
 } from "sequelize-typescript";
 import { User } from "./User";
-import { OrderDetail, IOrderDetailResponse } from "./OrderDetail";
+import { OrderDetail } from "./OrderDetail";
 
 export interface IOrderCreate {
   userId: number;
@@ -21,13 +23,15 @@ export interface IOrder {
   date: Date;
   totalAmount: number;
   status: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface IOrderResponse {
   orderId: number;
   userId: number;
   totalAmount: number;
-  orderDetails: IOrderDetailResponse[];
+  orderDetails: any[];
   date: Date;
   status: string;
 }
@@ -35,6 +39,18 @@ export interface IOrderResponse {
 @Table({
   tableName: "orders",
   timestamps: false,
+  underscored: true,
+  indexes: [
+    {
+      fields: ["user_id"],
+    },
+    {
+      fields: ["status"],
+    },
+    {
+      fields: ["date"],
+    },
+  ],
 })
 export class Order extends Model<IOrder, IOrderCreate> {
   @Column({
@@ -73,6 +89,9 @@ export class Order extends Model<IOrder, IOrderCreate> {
   })
   declare status: string;
 
-  user?: User;
-  orderDetails?: OrderDetail[];
+  @BelongsTo(() => User)
+  declare user?: User;
+
+  @HasMany(() => OrderDetail)
+  declare orderDetails?: OrderDetail[];
 }

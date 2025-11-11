@@ -92,7 +92,7 @@ export default function Orders({
       },
       render: (amount: number) => (
         <span className="font-bold text-green-600">
-          {amount.toLocaleString("vi-VN")}.000 vnđ
+          {amount.toLocaleString("vi-VN")} vnđ
         </span>
       ),
     },

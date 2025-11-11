@@ -1,29 +1,7 @@
+import type { IChatMessage, IChatSession } from "@/types/chatSession";
 import type { IResponse } from "@/types/Global";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
-
-export interface IChatSession {
-  id: number;
-  sessionId: string;
-  userId: number | null;
-  startDate: string;
-  endDate: string | null;
-  totalTokens: number;
-  status: "ACTIVE" | "ENDED";
-  messageCount?: number;
-  orderCount?: number;
-  userName?: string;
-}
-
-export interface IChatMessage {
-  id: number;
-  sessionId: number;
-  role: "user" | "assistant" | "system";
-  content: string;
-  toolUsed: string | null;
-  tokensUsed: number;
-  createdAt: string;
-}
 
 export async function createChatSession(
   sessionId: string,

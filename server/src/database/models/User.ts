@@ -1,4 +1,4 @@
-import { Table, Column, Model, DataType } from "sequelize-typescript";
+import { Table, Column, Model, DataType, HasMany } from "sequelize-typescript";
 import { Order } from "./Order";
 import { ChatSession } from "./ChatSession";
 
@@ -9,6 +9,8 @@ export interface IUserDB {
   name: string;
   phone: string;
   address: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface IUser {
@@ -46,6 +48,13 @@ export interface IAuthResponse {
 @Table({
   tableName: "users",
   timestamps: false,
+  underscored: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ["username"],
+    },
+  ],
 })
 export class User extends Model<IUserDB, IUserCreate> {
   @Column({
@@ -86,6 +95,9 @@ export class User extends Model<IUserDB, IUserCreate> {
   })
   declare address: string;
 
-  orders?: Order[];
-  chatSessions?: ChatSession[];
+  @HasMany(() => Order)
+  declare orders?: Order[];
+
+  @HasMany(() => ChatSession)
+  declare chatSessions?: ChatSession[];
 }

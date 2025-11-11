@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
-import {
-  getSessionStats,
-  type IChatSession,
-} from "@/actions/chatSession.actions";
+import { getSessionStats } from "@/actions/chatSession.actions";
 import SessionHistoryModal from "./SessionHistoryModal";
 import { Table, Tag, Button } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { EyeOutlined } from "@ant-design/icons";
+import { EyeOutlined, ReloadOutlined } from "@ant-design/icons";
+import type { IChatSession } from "@/types/chatSession";
 
 export default function SessionHistory() {
   const [sessions, setSessions] = useState<IChatSession[]>([]);
@@ -44,8 +42,21 @@ export default function SessionHistory() {
   const calculateDuration = (startDate: string, endDate: string | null) => {
     const start = new Date(startDate).getTime();
     const end = endDate ? new Date(endDate).getTime() : Date.now();
+
+    const days = Math.floor((end - start) / 86400000);
+    const hours = Math.floor((end - start) / 3600000) % 24;
     const minutes = Math.floor((end - start) / 60000);
-    return minutes > 0 ? `${minutes} phút` : "< 1 phút";
+    const seconds = Math.floor((end - start) / 1000) % 60;
+
+    if (days > 0) {
+      return `${days} ngày ${hours} giờ`;
+    } else if (hours > 0) {
+      return `${hours} giờ ${minutes % 60} phút`;
+    } else if (minutes > 0) {
+      return `${minutes} phút ${seconds} giây`;
+    } else {
+      return `${seconds} giây`;
+    }
   };
 
   const columns: ColumnsType<IChatSession> = [
@@ -53,31 +64,32 @@ export default function SessionHistory() {
       title: "Session ID",
       dataIndex: "sessionId",
       key: "sessionId",
-      width: 200,
+      width: 150,
       render: (text: string) => (
         <p className="font-mono text-xs truncate">{text}</p>
       ),
     },
     {
       title: "User",
-      dataIndex: "userName",
-      key: "userName",
+      dataIndex: "username",
+      key: "username",
       width: 100,
-      render: (text: string | null) =>
-        text || <p className="text-gray-400 truncate">Guest</p>,
+      render: (text: string | null) => (
+        <p className="text-gray-400 truncate">{text || "Guest"}</p>
+      ),
     },
     {
       title: "Bắt đầu",
       dataIndex: "startDate",
       key: "startDate",
-      width: 180,
+      width: 150,
       render: (date: string) => formatDate(date),
     },
     {
       title: "Kết thúc",
       dataIndex: "endDate",
       key: "endDate",
-      width: 180,
+      width: 150,
       render: (date: string | null) =>
         date ? formatDate(date) : <span className="text-gray-400">-</span>,
     },
@@ -103,11 +115,7 @@ export default function SessionHistory() {
       width: 100,
       align: "center",
       render: (count: number) =>
-        count ? (
-          <Tag color="green">{count}</Tag>
-        ) : (
-          <span className="text-gray-400">0</span>
-        ),
+        count ? <Tag color="green">{count}</Tag> : <Tag>0</Tag>,
     },
     {
       title: "Tokens",
@@ -146,9 +154,12 @@ export default function SessionHistory() {
   return (
     <div className="bg-white p-6 rounded-lg shadow h-full flex flex-col">
       <div className="mb-4 flex justify-between items-center flex-shrink-0">
-        <h2 className="text-2xl font-bold">
-          Quản lý và theo dõi các phiên chat với khách hàng
-        </h2>
+        <h2 className="text-2xl font-bold">Quản lý lịch sử trò chuyện</h2>
+        <Button
+          onClick={fetchSessions}
+          loading={loading}
+          icon={<ReloadOutlined />}
+        ></Button>
       </div>
 
       <Table

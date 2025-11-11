@@ -1,5 +1,4 @@
-import { Product, IProduct, IProductWithOutlet } from "../models/Product";
-import { Outlet } from "../models/Outlet";
+import { Product, IProduct, IProductWithOutlet, Outlet } from "../database/models";
 import { AppError } from "../utils/errors";
 import { EmbeddingService } from "./EmbeddingService";
 import { OutletService } from "./OutletService";
@@ -133,6 +132,23 @@ export class ProductService {
       }
 
       await existingProduct.update(product);
+
+      const outlet = await outletServices.getOutletById(
+        existingProduct.outletId
+      );
+
+      const data = {
+        id: existingProduct.id,
+        outletId: existingProduct.outletId,
+        name: existingProduct.name,
+        description: existingProduct.description,
+        price: existingProduct.price,
+        quantity: existingProduct.quantity,
+        outletName: outlet?.name!,
+        outletAddress: outlet?.address!,
+      };
+
+      await embeddingServices.updateProductWithOutletRow(data);
 
       return existingProduct.toJSON();
     } catch (error) {

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { createServices } from "../services";
-import { IOrderResponse } from "../models/Order";
+import { IOrderResponse } from "../database/models";
 
 export class OrderController {
   private services = createServices();

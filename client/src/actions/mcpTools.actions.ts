@@ -26,7 +26,7 @@ export async function chatWithMcpTools(
     });
 
     await mcpClient.ensureConnected();
-    console.log("[MCP Client] Connected");
+    console.log("[MCP Client] Connected. Session ID:", sessionId);
 
     const conversationContext = buildConversationContext(chatHistory);
 

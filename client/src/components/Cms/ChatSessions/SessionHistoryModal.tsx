@@ -1,16 +1,15 @@
-import { Modal, Table, Tag, Card, Descriptions, Timeline } from "antd";
+import { Modal, Table, Tag, Card, Descriptions, Timeline, Tabs } from "antd";
 import { useEffect, useState } from "react";
-import {
-  getSessionHistory,
-  type IChatMessage,
-  type IChatSession,
-} from "@/actions/chatSession.actions";
+import { getSessionHistory } from "@/actions/chatSession.actions";
 import ReactMarkdown from "react-markdown";
 import {
   UserOutlined,
   RobotOutlined,
   SettingOutlined,
+  MessageOutlined,
+  ShoppingCartOutlined,
 } from "@ant-design/icons";
+import type { IChatMessage, IChatSession } from "@/types/chatSession";
 
 interface SessionHistoryModalProps {
   sessionId: string | null;
@@ -80,49 +79,37 @@ export default function SessionHistoryModal({
     return new Date(dateStr).toLocaleString("vi-VN");
   };
 
-  const orderColumns = [
+  const orderDetailColumns = [
     {
-      title: "STT",
-      key: "index",
-      width: 60,
-      render: (_: any, __: any, index: number) => index + 1,
+      title: "Sản phẩm",
+      key: "product",
+      render: (_: any, record: any) => record.productName || "-",
     },
     {
-      title: "Mã đơn hàng",
-      dataIndex: "orderId",
-      key: "orderId",
-      render: (text: string) => `#${text}`,
+      title: "Số lượng",
+      dataIndex: "quantity",
+      key: "quantity",
+      align: "center" as const,
     },
     {
-      title: "Ngày tạo",
-      dataIndex: "date",
-      key: "date",
-      render: (date: string) => formatDate(date),
-    },
-    {
-      title: "Trạng thái",
-      dataIndex: "status",
-      key: "status",
-      render: (status: string) => {
-        const colors: Record<string, string> = {
-          PENDING: "orange",
-          CONFIRMED: "blue",
-          DELIVERED: "green",
-          CANCELLED: "red",
-        };
-        return <Tag color={colors[status] || "default"}>{status}</Tag>;
-      },
-    },
-    {
-      title: "Tổng tiền",
-      dataIndex: "totalAmount",
-      key: "totalAmount",
+      title: "Đơn giá",
+      dataIndex: "unitPrice",
+      key: "unitPrice",
       align: "right" as const,
-      render: (amount: number) => (
-        <span className="font-semibold text-green-600">
-          {amount?.toLocaleString("vi-VN")}đ
-        </span>
-      ),
+      render: (unitPrice: number) =>
+        `${unitPrice?.toLocaleString("vi-VN")} đ`,
+    },
+    {
+      title: "Thành tiền",
+      key: "subtotal",
+      align: "right" as const,
+      render: (_: any, record: any) => {
+        return (
+          <span className="font-semibold">
+            {record.subtotal.toLocaleString("vi-VN")}.000 đ
+          </span>
+        );
+      },
     },
   ];
 
@@ -158,6 +145,25 @@ export default function SessionHistoryModal({
         </div>
       ) : history ? (
         <div className="space-y-4">
+          {history.session.user && (
+            <Card title="Thông tin người dùng" size="small">
+              <Descriptions column={2} size="small">
+                <Descriptions.Item label="Username">
+                  {history.session.user.username}
+                </Descriptions.Item>
+                <Descriptions.Item label="Tên">
+                  {history.session.user.name || "N/A"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Số điện thoại">
+                  {history.session.user.phone || "N/A"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Địa chỉ">
+                  {history.session.user.address || "N/A"}
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+          )}
+
           <Card title="Thông tin Session" size="small">
             <Descriptions column={2} size="small">
               <Descriptions.Item label="Bắt đầu">
@@ -175,9 +181,7 @@ export default function SessionHistoryModal({
               </Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
                 <Tag
-                  color={
-                    history.session.status === "ACTIVE" ? "green" : "default"
-                  }
+                  color={history.session.status === "ACTIVE" ? "green" : "red"}
                 >
                   {history.session.status}
                 </Tag>
@@ -191,74 +195,154 @@ export default function SessionHistoryModal({
             </Descriptions>
           </Card>
 
-          {history.orders && history.orders.length > 0 && (
-            <Card
-              title={`Đơn hàng đã tạo (${history.orders.length})`}
-              size="small"
-            >
-              <Table
-                columns={orderColumns}
-                dataSource={history.orders}
-                pagination={false}
-                rowKey="id"
-                size="small"
-                bordered
-              />
-            </Card>
-          )}
-
-          <Card
-            title={`Lịch sử tin nhắn (${history.messages.length})`}
-            size="small"
-          >
-            <Timeline
-              items={history.messages.map((msg) => ({
-                dot: getRoleIcon(msg.role),
+          <Tabs
+            defaultActiveKey="messages"
+            items={[
+              {
+                key: "messages",
+                label: (
+                  <span>
+                    <MessageOutlined />
+                    <span className="text-sm text-gray-500">
+                      Lịch sử tin nhắn ({history.messages.length})
+                    </span>
+                  </span>
+                ),
                 children: (
-                  <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Tag color={getRoleColor(msg.role)}>
-                        {msg.role.toUpperCase()}
-                      </Tag>
-                      <span className="text-xs text-gray-500">
-                        {formatDate(msg.createdAt)}
-                      </span>
-                      {msg.tokensUsed > 0 && (
-                        <Tag color="purple">{msg.tokensUsed} tokens</Tag>
-                      )}
-                    </div>
-                    <div
-                      className={`p-3 rounded-lg ${
-                        msg.role === "user"
-                          ? "bg-blue-50"
-                          : msg.role === "assistant"
-                          ? "bg-green-50"
-                          : "bg-gray-50"
-                      }`}
-                    >
-                      {msg.role === "assistant" ? (
-                        <div className="prose prose-sm max-w-none">
-                          <ReactMarkdown>{msg.content}</ReactMarkdown>
-                        </div>
-                      ) : (
-                        <div className="whitespace-pre-wrap text-sm">
-                          {msg.content}
-                        </div>
-                      )}
-                      {msg.toolUsed && (
-                        <div className="mt-2 pt-2 border-t border-gray-200">
-                          <span className="text-xs text-gray-600">
-                            Tool used:{" "}
-                            <Tag className="font-mono">{msg.toolUsed}</Tag>
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                  <div>
+                    <Timeline
+                      items={history.messages.map((msg) => ({
+                        dot: getRoleIcon(msg.role),
+                        children: (
+                          <div className="mt-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Tag color={getRoleColor(msg.role)}>
+                                {msg.role.toUpperCase()}
+                              </Tag>
+                              <span className="text-xs text-gray-500">
+                                {formatDate(msg.createdAt)}
+                              </span>
+                              {msg.tokensUsed > 0 && (
+                                <Tag color="purple">
+                                  {msg.tokensUsed} tokens
+                                </Tag>
+                              )}
+                            </div>
+                            <div
+                              className={`p-3 rounded-lg ${
+                                msg.role === "user"
+                                  ? "bg-blue-50"
+                                  : msg.role === "assistant"
+                                  ? "bg-green-50"
+                                  : "bg-gray-50"
+                              }`}
+                            >
+                              {msg.role === "assistant" ? (
+                                <div className="prose prose-sm max-w-none">
+                                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                </div>
+                              ) : (
+                                <div className="whitespace-pre-wrap text-sm">
+                                  {msg.content}
+                                </div>
+                              )}
+                              {msg.toolUsed && (
+                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                  <span className="text-xs text-gray-600">
+                                    Tool used:{" "}
+                                    <Tag className="font-mono">
+                                      {msg.toolUsed}
+                                    </Tag>
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ),
+                      }))}
+                    />
                   </div>
                 ),
-              }))}
-            />
-          </Card>
+              },
+              {
+                key: "orders",
+                label: (
+                  <span>
+                    <ShoppingCartOutlined />
+                    <span className="text-sm text-gray-500">
+                      Lịch sử đơn hàng ({history.orders.length})
+                    </span>
+                  </span>
+                ),
+                children:
+                  history.orders && history.orders.length > 0 ? (
+                    <div className="space-y-4">
+                      {history.orders.map((order: any) => (
+                        <Card key={order.id} size="small" variant={undefined}>
+                          <div className="flex justify-between items-center mb-3">
+                            <div>
+                              <span className="font-semibold text-base">
+                                Đơn hàng #{order.orderId}
+                              </span>
+                              <span className="text-xs text-gray-500 ml-2">
+                                {formatDate(order.date)}
+                              </span>
+                            </div>
+                            <Tag
+                              color={
+                                (
+                                  {
+                                    PENDING: "orange",
+                                    CONFIRMED: "blue",
+                                    DELIVERED: "green",
+                                    CANCELLED: "red",
+                                  } as Record<string, string>
+                                )[order.status] || "default"
+                              }
+                            >
+                              {order.status}
+                            </Tag>
+                          </div>
+                          <Table
+                            columns={orderDetailColumns}
+                            dataSource={order.orderDetails}
+                            rowKey="id"
+                            pagination={false}
+                            size="small"
+                            bordered
+                            summary={(pageData) => {
+                              const total = pageData.reduce(
+                                (sum, record) =>
+                                  sum + record.quantity * record.unitPrice,
+                                0
+                              );
+                              return (
+                                <Table.Summary.Row>
+                                  <Table.Summary.Cell index={0} colSpan={3}>
+                                    <span className="font-bold">
+                                      Tổng cộng:
+                                    </span>
+                                  </Table.Summary.Cell>
+                                  <Table.Summary.Cell index={1} align="right">
+                                    <span className="font-bold text-green-600">
+                                      {total.toLocaleString("vi-VN")}.000 đ
+                                    </span>
+                                  </Table.Summary.Cell>
+                                </Table.Summary.Row>
+                              );
+                            }}
+                          />
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-500 py-8">
+                      Chưa có đơn hàng nào
+                    </div>
+                  ),
+              },
+            ]}
+          />
         </div>
       ) : (
         <div className="text-center text-gray-500 py-8">

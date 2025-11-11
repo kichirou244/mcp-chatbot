@@ -1,5 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import HomePage from "./pages/Home";
 import AuthPage from "./pages/Auth";
 import CmsDashboard from "./pages/Cms/Dashboard";
@@ -15,8 +16,8 @@ const GuestRoute: React.FC<{ children: React.ReactElement }> = ({
 }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (!isLoading)
-    return isAuthenticated ? <Navigate to="/" replace /> : children;
+  if (isLoading) return null;
+  return isAuthenticated ? <Navigate to="/" replace /> : children;
 };
 
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({
@@ -24,70 +25,72 @@ const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({
 }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (!isLoading)
-    return isAuthenticated ? children : <Navigate to="/auth" replace />;
+  if (isLoading) return null;
+  return isAuthenticated ? children : <Navigate to="/auth" replace />;
 };
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route
-              path="/auth"
-              element={
-                <GuestRoute>
-                  <AuthPage />
-                </GuestRoute>
-              }
-            />
+    <HelmetProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route
+                path="/auth"
+                element={
+                  <GuestRoute>
+                    <AuthPage />
+                  </GuestRoute>
+                }
+              />
 
-            <Route
-              path="/cms"
-              element={
-                <ProtectedRoute>
-                  <CmsDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/cms/products"
-              element={
-                <ProtectedRoute>
-                  <CmsProducts />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/cms/orders"
-              element={
-                <ProtectedRoute>
-                  <CmsOrders />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/cms/outlets"
-              element={
-                <ProtectedRoute>
-                  <CmsOutlets />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/cms/chat-sessions"
-              element={
-                <ProtectedRoute>
-                  <ChatSessionsPage />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </BrowserRouter>
-      </NotificationProvider>
-    </AuthProvider>
+              <Route
+                path="/cms"
+                element={
+                  <ProtectedRoute>
+                    <CmsDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cms/products"
+                element={
+                  <ProtectedRoute>
+                    <CmsProducts />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cms/orders"
+                element={
+                  <ProtectedRoute>
+                    <CmsOrders />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cms/outlets"
+                element={
+                  <ProtectedRoute>
+                    <CmsOutlets />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cms/chat-sessions"
+                element={
+                  <ProtectedRoute>
+                    <ChatSessionsPage />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </BrowserRouter>
+        </NotificationProvider>
+      </AuthProvider>
+    </HelmetProvider>
   );
 };
 
